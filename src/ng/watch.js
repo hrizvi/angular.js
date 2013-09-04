@@ -35,7 +35,7 @@ $WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep
 
   var desc = this.$parse.prepareObservable(exp);
   if (!desc.observable || desc.paths.length === 0) {
-    this.queueListener_(listener, desc.get(), undefined);
+    this.queueListener_(obj, listener, desc.get(), undefined);
     this.setDeliverTimeout();
     return noop;
   }
@@ -48,8 +48,9 @@ $WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep
 };
 
 
-$WatchProvider.WatchManager.prototype.queueListener_ = function (listener, value, last) {
+$WatchProvider.WatchManager.prototype.queueListener_ = function (obj, listener, value, last) {
   var queue_item = {
+    obj: obj,
     watcher: null,
     listener: listener,
     value: value,
@@ -65,6 +66,7 @@ $WatchProvider.WatchManager.prototype.queueWatcherListener_ = function (watcher,
   delete this.queue_[index];
 
   var queue_item = {
+    obj: watcher.$$obj,
     watcher: watcher,
     listener: listener,
     value: value,
@@ -94,7 +96,7 @@ $WatchProvider.WatchManager.prototype.addWatcher_ = function (obj, desc, listene
   };
 
   this.watchers_.push(watcher);
-  this.queueListener_(listener, last_value, undefined);
+  this.queueWatcherListener_(watcher, listener, last_value, undefined);
   this.setDeliverTimeout();
 
   return watcher;
@@ -123,7 +125,7 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
       if (item.watcher) {
         delete watcher_indexes[item.watcher.$$id];
       }
-      item.listener.call(null, item.value, item.last_value);
+      item.listener.call(null, item.value, item.last_value, item.obj);
     }
   }
 };
@@ -160,6 +162,7 @@ $WatchProvider.Watcher = function (obj, paths) {
   var self = this;
 
   this.$$id = (++$WatchProvider.Watcher.prototype.$$id);
+  this.$$obj = obj;
 
   /**
    * @type {!Array.<!PathObserver>}
