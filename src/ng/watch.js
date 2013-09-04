@@ -35,8 +35,8 @@ $WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep
 
   var desc = this.$parse.prepareObservable(exp);
   if (!desc.observable || desc.paths.length === 0) {
-    self.queueListener_(listener, last_value, undefined);
-    self.setDeliverTimeout();
+    this.queueListener_(listener, desc.get(), undefined);
+    this.setDeliverTimeout();
     return noop;
   }
 
@@ -94,8 +94,8 @@ $WatchProvider.WatchManager.prototype.addWatcher_ = function (obj, desc, listene
   };
 
   this.watchers_.push(watcher);
-  self.queueListener_(listener, last_value, undefined);
-  self.setDeliverTimeout();
+  this.queueListener_(listener, last_value, undefined);
+  this.setDeliverTimeout();
 
   return watcher;
 };
