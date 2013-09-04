@@ -115,6 +115,9 @@ Lexer.prototype = {
 
     this.tokens = [];
 
+    this.idents = [];
+    this.ident_paths = [];
+
     var token;
     var json = [];
 
@@ -318,6 +321,30 @@ Lexer.prototype = {
         text: methodName,
         json: false
       });
+
+      ident += '.' + methodName;
+    }
+
+    var isInvocation = this.text.charAt(this.index) === '(';
+    var isKey = this.text.charAt(this.index) === ':';
+    this.pushIdent(ident, !isInvocation && !isKey && !methodName);
+  },
+
+  pushIdent: function(path, observable) {
+    if (OPERATORS[path]) {
+      return;
+    }
+
+    var index = this.ident_paths.indexOf(path);
+    if (index === -1) {
+      this.ident_paths.push(path);
+      this.idents.push({
+        path: path,
+        observable: observable
+      });
+    } else {
+      var known = this.idents[index];
+      known.observable = (known.observable && observable);
     }
   },
 
@@ -1030,9 +1057,11 @@ function getterFn(path, csp, fullExp) {
  *
  */
 function $ParseProvider() {
-  var cache = {};
   this.$get = ['$filter', '$sniffer', function($filter, $sniffer) {
-    return function(exp) {
+    var cache = {};
+    var cacheObservables = {};
+
+    var $parse = function(exp) {
       switch (typeof exp) {
         case 'string':
           if (cache.hasOwnProperty(exp)) {
@@ -1050,5 +1079,50 @@ function $ParseProvider() {
           return noop;
       }
     };
+
+    // TODO: choose a better name?
+    $parse.prepareObservable = function(exp) {
+      switch (typeof exp) {
+        case 'string':
+          if (cacheObservables.hasOwnProperty(exp)) {
+            return cacheObservables[exp];
+          }
+
+          var lexer = new Lexer($sniffer.csp);
+          var parser = new Parser(lexer, $filter, $sniffer.csp);
+
+          var get = parser.parse(exp, false);
+
+          var idents = lexer.idents;
+          var paths = [];
+          var observable = true;
+          forEach(idents, function (ident) {
+            paths.push(ident.path);
+            observable = observable && ident.observable;
+          });
+
+          return cacheObservables[exp] = {
+            get: get,
+            observable: (paths.length > 0) ? observable : false,
+            paths: paths
+          };
+
+        case 'function':
+          return {
+            get: exp,
+            observable: false,
+            paths: null
+          };
+
+        default:
+          return {
+            get: noop,
+            observable: false,
+            paths: null
+          };
+      }
+    };
+
+    return $parse;
   }];
 }

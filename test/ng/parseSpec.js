@@ -182,6 +182,43 @@ describe('parser', function() {
         lex("'\\u1''bla'");
       }).toThrowMinErr("$parse", "lexerr", "Lexer Error: Invalid unicode escape [\\u1''b] at column 2 in expression ['\\u1''bla'].");
     });
+
+
+    describe('identifier paths', function() {
+      it('should produce a list of identifier paths', function() {
+        var lexer = new Lexer(false);
+        lexer.lex("a.b.c + unicorn[3] + x.y(d.e)");
+
+        var idents = lexer.idents;
+        expect(map(idents, function(ident) { return ident.path; }))
+          .toEqual(['a.b.c', 'unicorn', 'x.y', 'd.e']);
+        expect(map(idents, function(ident) { return ident.observable; }))
+          .toEqual([true, true, false, true]);
+      });
+
+      it('should not include duplicates in the list of identifier paths', function() {
+        var lexer = new Lexer(false);
+        lexer.lex("a + a");
+
+        var idents = lexer.idents;
+        expect(map(idents, function(ident) { return ident.path; }))
+          .toEqual(['a']);
+        expect(map(idents, function(ident) { return ident.observable; }))
+          .toEqual([true]);
+      });
+
+      it('should not always mark methods as not observable in the list of identifier paths',
+          function() {
+        var lexer = new Lexer(false);
+        lexer.lex("a + a() + b() + b");
+
+        var idents = lexer.idents;
+        expect(map(idents, function(ident) { return ident.path; }))
+          .toEqual(['a', 'b']);
+        expect(map(idents, function(ident) { return ident.observable; }))
+          .toEqual([false, false]);
+      });
+    });
   });
 
   var $filterProvider, scope;
