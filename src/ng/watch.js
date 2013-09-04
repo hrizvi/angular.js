@@ -7,6 +7,7 @@ function $WatchProvider() {
     var manager = new $WatchProvider.WatchManager($parse);
 
     var $watch = manager.watch.bind(manager);
+    $watch.subscribe = manager.subscribe.bind(manager);
     $watch.flush = manager.flush.bind(manager);
     $watch.disposeAll = manager.disposeAll.bind(manager);
 
@@ -22,6 +23,8 @@ $WatchProvider.WatchManager = function ($parse) {
   this.$parse = $parse;
 
   this.watchers_ = [];
+  this.subscribers_ = [];
+
   this.queue_ = [];
   this.watcher_queue_indexes_ = {};
   this.deliver_timeout_ = 0;
@@ -44,6 +47,16 @@ $WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep
 
   return function () {
     watcher.dispose();
+  };
+};
+
+
+$WatchProvider.WatchManager.prototype.subscribe = function (subscriber) {
+  this.subscribers_.push(subscriber);
+
+  var self = this;
+  return function () {
+    self.subscribers_.splice(self.subscribers_.indexOf(subscriber), 1);
   };
 };
 
@@ -118,8 +131,12 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
   var queue = this.queue_;
   var watcher_indexes = this.watcher_queue_indexes_;
 
-  var i = queue.length;
-  while (i--) {
+  var queue_length = queue.length;
+  if (queue_length === 0) {
+    return;
+  }
+
+  while (queue_length--) {
     var item = queue.shift();
     if (item) {
       if (item.watcher) {
@@ -128,6 +145,10 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
       item.listener.call(null, item.value, item.last_value, item.obj);
     }
   }
+
+  forEach(this.subscribers_, function (subscriber) {
+    subscriber();
+  });
 };
 
 

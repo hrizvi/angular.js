@@ -144,6 +144,66 @@ describe('$watch', function () {
   });
 
 
+  describe('subscribe', function () {
+    it('should allow subscribing to all changes to observed paths', inject(function ($watch) {
+      var count = 0;
+
+      obj.a = 3;
+      $watch(obj, 'a', noop);
+      $watch.subscribe(function () {
+        count = 1;
+      });
+
+      $watch.flush();
+      count = 0;
+
+      obj.a = 4;
+
+      $watch.flush();
+      expect(count).toBe(1);
+    }));
+
+
+    it('should not call subscriber if no paths are being observed on flush', inject(
+        function ($watch) {
+      var count = 0;
+
+      $watch.subscribe(function () {
+        count = 1;
+      });
+
+      $watch.flush();
+      count = 0;
+
+      $watch.flush();
+      expect(count).toBe(0);
+    }));
+
+
+    it('should aggregate changes to multiple paths into one subscriber call', inject(
+        function ($watch) {
+      var count = 0;
+
+      obj.a = 3;
+      obj.b = 4;
+      $watch(obj, 'a', noop);
+      $watch(obj, 'b', noop);
+      $watch.subscribe(function () {
+        count = 1;
+      });
+
+      $watch.flush();
+      count = 0;
+
+      obj.a = 4;
+      obj.b = 5;
+
+      $watch.flush();
+      expect(count).toBe(1);
+    }));
+  });
+
+
   describe('disposal', function () {
     it('should allow watcher disposal via a returned function', inject(function ($watch) {
       var count = 0;
