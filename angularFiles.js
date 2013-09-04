@@ -30,6 +30,7 @@ angularFiles = {
     'src/ng/sniffer.js',
     'src/ng/timeout.js',
     'src/ng/urlUtils.js',
+    'src/ng/watch.js',
     'src/ng/window.js',
 
     'src/ng/filter.js',
@@ -79,6 +80,7 @@ angularFiles = {
     'src/ngTouch/swipe.js',
     'src/ngTouch/directive/ngClick.js',
     'src/ngTouch/directive/ngSwipe.js',
+    'bower_components/observe.js/src/observe.js',
     'docs/components/angular-bootstrap/bootstrap.js',
   ],
 
