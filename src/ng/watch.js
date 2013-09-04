@@ -15,7 +15,7 @@ function $WatchProvider() {
 
   this.$get = [ '$parse', function ($parse) {
     var callWatch = function (obj, exp, listener, deep_equal) {
-      boundWatch(obj, exp, listener, deep_equal, $parse);
+      return boundWatch(obj, exp, listener, deep_equal, $parse);
     };
 
     callWatch.flush = boundFlush;
@@ -38,7 +38,7 @@ $WatchProvider.prototype.watch = function (obj, exp, listener, deep_equal, $pars
     return noop;
   }
 
-  this.addWatcher_(obj, desc, listener, deep_equal);
+  var watcher = this.addWatcher_(obj, desc, listener, deep_equal);
 
   return function () {
     watcher.dispose();
@@ -94,6 +94,8 @@ $WatchProvider.prototype.addWatcher_ = function (obj, desc, listener, deep_equal
   this.watchers_.push(watcher);
   self.queueListener_(listener, last_value, undefined);
   self.setDeliverTimeout();
+
+  return watcher;
 };
 
 

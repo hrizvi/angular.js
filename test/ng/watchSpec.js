@@ -142,4 +142,25 @@ describe('$watch', function () {
       expect(count).toBe(0);
     }));
   });
+
+
+  describe('disposal', function () {
+    it('should allow watcher disposal via a returned function', inject(function ($watch) {
+      var count = 0;
+
+      obj.a = 3;
+      var dispose = $watch(obj, 'a', function (value, old_value) {
+        count += 1;
+      });
+
+      $watch.flush();
+      count = 0;
+
+      dispose();
+      obj.a = 4;
+
+      $watch.flush();
+      expect(count).toBe(0);
+    }));
+  });
 });
