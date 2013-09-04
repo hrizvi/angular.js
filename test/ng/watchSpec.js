@@ -68,6 +68,18 @@ describe('$watch', function () {
   }));
 
 
+  it('should not watch constants but call the listener on registration', inject(function ($watch) {
+    var watch_value;
+
+    $watch(obj, '5', function (value, old_value) {
+      watch_value = value;
+    });
+
+    $watch.flush();
+    expect(watch_value).toBe(5);
+  }));
+
+
   it('should aggregate changes to multiple paths within one watcher', inject(function ($watch) {
     var count = 0;
 
