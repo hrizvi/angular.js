@@ -11,12 +11,16 @@ function $WatchProvider() {
 
   var boundWatch = this.watch.bind(this);
   var boundFlush = this.flush.bind(this);
+  var boundDisposeAll = this.disposeAll.bind(this);
 
   this.$get = [ '$parse', function ($parse) {
     var callWatch = function (obj, exp, listener, deep_equal) {
       boundWatch(obj, exp, listener, deep_equal, $parse);
     };
+
     callWatch.flush = boundFlush;
+    callWatch.disposeAll = boundDisposeAll;
+
     return callWatch;
   }];
 };
@@ -102,6 +106,7 @@ $WatchProvider.prototype.setDeliverTimeout = function () {
 
 
 $WatchProvider.prototype.deliver_ = function () {
+  clearTimeout(this.deliver_timeout_);
   this.deliver_timeout_ = 0;
 
   var queue = this.queue_;
@@ -126,6 +131,18 @@ $WatchProvider.prototype.flush = function () {
   });
 
   this.deliver_();
+};
+
+
+$WatchProvider.prototype.disposeAll = function () {
+  clearTimeout(this.deliver_timeout_);
+
+  this.watchers_.forEach(function (watcher) {
+    watcher.dispose();
+  });
+
+  this.queue_ = [];
+  this.watcher_queue_indexes_ = {};
 };
 
 
