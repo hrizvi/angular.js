@@ -13,8 +13,8 @@ function $WatchProvider() {
   var boundFlush = this.flush.bind(this);
 
   this.$get = [ '$parse', function ($parse) {
-    var callWatch = function (obj, exp, listener) {
-      boundWatch(obj, exp, listener, $parse);
+    var callWatch = function (obj, exp, listener, deep_equal) {
+      boundWatch(obj, exp, listener, deep_equal, $parse);
     };
     callWatch.flush = boundFlush;
     return callWatch;
@@ -22,7 +22,7 @@ function $WatchProvider() {
 };
 
 
-$WatchProvider.prototype.watch = function (obj, exp, listener, $parse) {
+$WatchProvider.prototype.watch = function (obj, exp, listener, deep_equal, $parse) {
   if (!isString(exp)) {
     throw new Error('Watch expression can only by strings');
   }
@@ -34,7 +34,7 @@ $WatchProvider.prototype.watch = function (obj, exp, listener, $parse) {
     return noop;
   }
 
-  this.addWatcher_(obj, desc, listener);
+  this.addWatcher_(obj, desc, listener, deep_equal);
 
   return function () {
     watcher.dispose();
@@ -70,17 +70,21 @@ $WatchProvider.prototype.queueWatcherListener_ = function (watcher, listener, va
 };
 
 
-$WatchProvider.prototype.addWatcher_ = function (obj, desc, listener) {
+$WatchProvider.prototype.addWatcher_ = function (obj, desc, listener, deep_equal) {
   var watcher = new $WatchProvider.Watcher(obj, desc.paths);
   var last_value = desc.get(obj);
 
   var self = this;
   watcher.onchange = function (changed_path) {
+    // Note: Both Object.observer and Polymer/observe-js check for NaNs.
+
     var value = desc.get(obj);
-    self.queueWatcherListener_(watcher, listener, value, last_value);
+    if (!deep_equal || !equals(value, last_value)) {
+      self.queueWatcherListener_(watcher, listener, value, last_value);
+      self.setDeliverTimeout();
+    }
 
     last_value = value;
-    self.setDeliverTimeout();
   };
 
   this.watchers_.push(watcher);

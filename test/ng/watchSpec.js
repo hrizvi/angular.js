@@ -1,6 +1,5 @@
 
 describe('$watch', function () {
-
   it('should call listener after registration', inject(function ($rootScope, $watch) {
     var watch_value;
 
@@ -79,4 +78,62 @@ describe('$watch', function () {
     $watch.flush();
     expect(count).toBe(1);
   }));
+
+
+  it('should not consider NaNs different', inject(function ($rootScope, $watch) {
+    var count = 0;
+
+    $rootScope.a = NaN;
+    $watch($rootScope, 'a', function (value, old_value) {
+      count += 1;
+    });
+
+    $watch.flush();
+    count = 0;
+
+    $rootScope.a = NaN;
+
+    $watch.flush();
+    expect(count).toBe(0);
+  }));
+
+
+  it('should not consider changes to deeper levels changes', inject(function ($rootScope, $watch) {
+    var count = 0;
+
+    $rootScope.a = { x: 2, y: { a: 3, b: 4 }};
+    $watch($rootScope, 'a', function (value, old_value) {
+      count += 1;
+    }, true);
+
+    $watch.flush();
+    count = 0;
+
+    $rootScope.a.x = 3;
+    $rootScope.a.y.a = 5;
+
+    $watch.flush();
+    expect(count).toBe(0);
+  }));
+
+
+  describe('deep equality mode', function () {
+    it('should not consider different objects with the same key/value pairs different', inject(
+        function ($rootScope, $watch) {
+      var count = 0;
+
+      $rootScope.a = { x: 2, y: { a: 3, b: 4 }};
+      $watch($rootScope, 'a', function (value, old_value) {
+        count += 1;
+      }, true);
+
+      $watch.flush();
+      count = 0;
+
+      $rootScope.a = { x: 2, y: { a: 3, b: 4 }};
+
+      $watch.flush();
+      expect(count).toBe(0);
+    }));
+  });
 });
