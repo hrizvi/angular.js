@@ -1,37 +1,39 @@
 
 /**
  * @constructor
- * @ngInject
  */
 function $WatchProvider() {
-  this.watchers_ = [];
-  this.queue_ = [];
-  this.watcher_queue_indexes_ = {};
-  this.deliver_timeout_ = 0;
-
-  var boundWatch = this.watch.bind(this);
-  var boundFlush = this.flush.bind(this);
-  var boundDisposeAll = this.disposeAll.bind(this);
-
   this.$get = [ '$parse', function ($parse) {
-    var callWatch = function (obj, exp, listener, deep_equal) {
-      return boundWatch(obj, exp, listener, deep_equal, $parse);
-    };
+    var manager = new $WatchProvider.WatchManager($parse);
 
-    callWatch.flush = boundFlush;
-    callWatch.disposeAll = boundDisposeAll;
+    var $watch = manager.watch.bind(manager);
+    $watch.flush = manager.flush.bind(manager);
+    $watch.disposeAll = manager.disposeAll.bind(manager);
 
-    return callWatch;
+    return $watch;
   }];
 };
 
 
-$WatchProvider.prototype.watch = function (obj, exp, listener, deep_equal, $parse) {
+/**
+ * @constructor
+ */
+$WatchProvider.WatchManager = function ($parse) {
+  this.$parse = $parse;
+
+  this.watchers_ = [];
+  this.queue_ = [];
+  this.watcher_queue_indexes_ = {};
+  this.deliver_timeout_ = 0;
+};
+
+
+$WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep_equal, $parse) {
   if (!isString(exp)) {
     throw new Error('Watch expression can only by strings');
   }
 
-  var desc = $parse.prepareObservable(exp);
+  var desc = this.$parse.prepareObservable(exp);
   if (!desc.observable || desc.paths.length === 0) {
     self.queueListener_(listener, last_value, undefined);
     self.setDeliverTimeout();
@@ -46,7 +48,7 @@ $WatchProvider.prototype.watch = function (obj, exp, listener, deep_equal, $pars
 };
 
 
-$WatchProvider.prototype.queueListener_ = function (listener, value, last) {
+$WatchProvider.WatchManager.prototype.queueListener_ = function (listener, value, last) {
   var queue_item = {
     watcher: null,
     listener: listener,
@@ -58,7 +60,7 @@ $WatchProvider.prototype.queueListener_ = function (listener, value, last) {
 };
 
 
-$WatchProvider.prototype.queueWatcherListener_ = function (watcher, listener, value, last) {
+$WatchProvider.WatchManager.prototype.queueWatcherListener_ = function (watcher, listener, value, last) {
   var index = this.watcher_queue_indexes_[watcher.$$id];
   delete this.queue_[index];
 
@@ -74,7 +76,7 @@ $WatchProvider.prototype.queueWatcherListener_ = function (watcher, listener, va
 };
 
 
-$WatchProvider.prototype.addWatcher_ = function (obj, desc, listener, deep_equal) {
+$WatchProvider.WatchManager.prototype.addWatcher_ = function (obj, desc, listener, deep_equal) {
   var watcher = new $WatchProvider.Watcher(obj, desc.paths);
   var last_value = desc.get(obj);
 
@@ -99,7 +101,7 @@ $WatchProvider.prototype.addWatcher_ = function (obj, desc, listener, deep_equal
 };
 
 
-$WatchProvider.prototype.setDeliverTimeout = function () {
+$WatchProvider.WatchManager.prototype.setDeliverTimeout = function () {
   if (!this.deliver_timeout_) {
     // call listeners at the beginning of the next available microtask
     this.deliver_timeout_ = setTimeout(this.deliver_.bind(this), 0);
@@ -107,7 +109,7 @@ $WatchProvider.prototype.setDeliverTimeout = function () {
 };
 
 
-$WatchProvider.prototype.deliver_ = function () {
+$WatchProvider.WatchManager.prototype.deliver_ = function () {
   clearTimeout(this.deliver_timeout_);
   this.deliver_timeout_ = 0;
 
@@ -127,7 +129,7 @@ $WatchProvider.prototype.deliver_ = function () {
 };
 
 
-$WatchProvider.prototype.flush = function () {
+$WatchProvider.WatchManager.prototype.flush = function () {
   this.watchers_.forEach(function (watcher) {
     watcher.flush();
   });
@@ -136,7 +138,7 @@ $WatchProvider.prototype.flush = function () {
 };
 
 
-$WatchProvider.prototype.disposeAll = function () {
+$WatchProvider.WatchManager.prototype.disposeAll = function () {
   clearTimeout(this.deliver_timeout_);
 
   this.watchers_.forEach(function (watcher) {
