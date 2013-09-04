@@ -28,7 +28,7 @@ $WatchProvider.WatchManager = function ($parse) {
 };
 
 
-$WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep_equal, $parse) {
+$WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep_equal) {
   if (!isString(exp)) {
     throw new Error('Watch expression can only by strings');
   }
