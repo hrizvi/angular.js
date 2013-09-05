@@ -170,6 +170,37 @@ describe('$watch', function () {
   });
 
 
+  describe('ordering', function () {
+    it('should fire watches in order of addition', inject(function($watch) {
+      // this is not an external guarantee, just our own sanity
+      var log = '';
+
+      obj.a = 1;
+      obj.b = 1;
+      obj.c = 1;
+
+      $watch(obj, 'a', function() { log += 'a'; });
+      $watch(obj, 'b', function() { log += 'b'; });
+      // constant expressions have slightly different handling,
+      // let's ensure they are kept in the same list as others
+      $watch(obj, '1', function() { log += '1'; });
+      $watch(obj, 'c', function() { log += 'c'; });
+      $watch(obj, '2', function() { log += '2'; });
+
+      $watch.flush();
+      expect(log).toEqual('ab1c2');
+
+      obj.c = 2;
+      obj.a = 2;
+      obj.b = 2;
+
+      log = '';
+      $watch.flush();
+      expect(log).toEqual('abc');
+    }));
+  });
+
+
   describe('deep equality mode', function () {
     it('should not consider different objects with the same key/value pairs different', inject(
         function ($watch) {
