@@ -2,10 +2,16 @@
 describe('$watch', function () {
   var obj;
 
-  beforeEach(inject(function ($watch) {
-    $watch.disposeAll();
-    obj = {};
-  }));
+  beforeEach(function () {
+    module(function ($exceptionHandlerProvider) {
+      $exceptionHandlerProvider.mode('log');
+    });
+
+    inject(function ($watch) {
+      $watch.disposeAll();
+      obj = {};
+    });
+  });
 
   it('should call listener after registration', inject(function ($watch) {
     var watch_value;
@@ -133,6 +139,35 @@ describe('$watch', function () {
     $watch.flush();
     expect(count).toBe(0);
   }));
+
+
+  describe('exceptions', function () {
+    it('should delegate exceptions from watcher listeners', inject(function ($watch, $exceptionHandler, $log) {
+      obj.a = 3;
+
+      $watch(obj, 'a', function () {
+        throw new Error('abc');
+      });
+
+      $watch.flush();
+      expect($exceptionHandler.errors[0].message).toEqual('abc');
+      $log.assertEmpty();
+    }));
+
+
+    it('should delegate exceptions from subscribers', inject(function ($watch, $exceptionHandler, $log) {
+      obj.a = 3;
+
+      $watch(obj, 'a', noop);
+      $watch.subscribe(function () {
+        throw new Error('abc');
+      });
+
+      $watch.flush();
+      expect($exceptionHandler.errors[0].message).toEqual('abc');
+      $log.assertEmpty();
+    }));
+  });
 
 
   describe('deep equality mode', function () {

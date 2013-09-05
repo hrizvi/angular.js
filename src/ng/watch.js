@@ -3,8 +3,8 @@
  * @constructor
  */
 function $WatchProvider() {
-  this.$get = [ '$parse', function ($parse) {
-    var manager = new $WatchProvider.WatchManager($parse);
+  this.$get = [ '$parse', '$exceptionHandler', function ($parse, $exceptionHandler) {
+    var manager = new $WatchProvider.WatchManager($parse, $exceptionHandler);
 
     var $watch = manager.watch.bind(manager);
     $watch.subscribe = manager.subscribe.bind(manager);
@@ -19,8 +19,9 @@ function $WatchProvider() {
 /**
  * @constructor
  */
-$WatchProvider.WatchManager = function ($parse) {
+$WatchProvider.WatchManager = function ($parse, $exceptionHandler) {
   this.$parse = $parse;
+  this.$exceptionHandler = $exceptionHandler;
 
   this.watchers_ = [];
   this.subscribers_ = [];
@@ -142,13 +143,22 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
       if (item.watcher) {
         delete watcher_indexes[item.watcher.$$id];
       }
-      item.listener.call(null, item.value, item.last_value, item.obj);
+
+      try {
+        item.listener.call(null, item.value, item.last_value, item.obj);
+      } catch (err) {
+        this.$exceptionHandler(err);
+      }
     }
   }
 
   forEach(this.subscribers_, function (subscriber) {
-    subscriber();
-  });
+    try {
+      subscriber();
+    } catch (err) {
+      this.$exceptionHandler(err);
+    }
+  }, this);
 };
 
 
