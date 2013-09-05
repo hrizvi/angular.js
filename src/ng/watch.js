@@ -28,7 +28,9 @@ $WatchProvider.WatchManager = function ($parse, $exceptionHandler) {
 
   this.queue_ = [];
   this.watcher_queue_indexes_ = {};
-  this.deliver_timeout_ = 0;
+
+  this.deliveries_ = 0;
+  this.delivery_observer_ = new PathObserver(this, 'deliveries_', this.deliver_, this);
 };
 
 
@@ -40,7 +42,7 @@ $WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep
   var desc = this.$parse.prepareObservable(exp);
   if (!desc.observable || desc.paths.length === 0) {
     this.queueListener_(obj, listener, desc.get(), undefined);
-    this.setDeliverTimeout();
+    this.reportDelivery_();
     return noop;
   }
 
@@ -103,7 +105,7 @@ $WatchProvider.WatchManager.prototype.addWatcher_ = function (obj, desc, listene
     var value = desc.get(obj);
     if (!deep_equal || !equals(value, last_value)) {
       self.queueWatcherListener_(watcher, listener, value, last_value);
-      self.setDeliverTimeout();
+      self.reportDelivery_();
     }
 
     last_value = value;
@@ -111,24 +113,18 @@ $WatchProvider.WatchManager.prototype.addWatcher_ = function (obj, desc, listene
 
   this.watchers_.push(watcher);
   this.queueWatcherListener_(watcher, listener, last_value, undefined);
-  this.setDeliverTimeout();
+  this.reportDelivery_();
 
   return watcher;
 };
 
 
-$WatchProvider.WatchManager.prototype.setDeliverTimeout = function () {
-  if (!this.deliver_timeout_) {
-    // call listeners at the beginning of the next available microtask
-    this.deliver_timeout_ = setTimeout(this.deliver_.bind(this), 0);
-  }
+$WatchProvider.WatchManager.prototype.reportDelivery_ = function () {
+  this.deliveries_ += 1;
 };
 
 
 $WatchProvider.WatchManager.prototype.deliver_ = function () {
-  clearTimeout(this.deliver_timeout_);
-  this.deliver_timeout_ = 0;
-
   var queue = this.queue_;
   var watcher_indexes = this.watcher_queue_indexes_;
 
@@ -163,23 +159,30 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
 
 
 $WatchProvider.WatchManager.prototype.flush = function () {
+  var delivers_before = this.deliveries_;
+
   this.watchers_.forEach(function (watcher) {
     watcher.flush();
   });
 
-  this.deliver_();
+  this.delivery_observer_.deliver();
+  if (this.deliveries_ !== delivers_before) {
+    this.flush();
+  }
 };
 
 
 $WatchProvider.WatchManager.prototype.disposeAll = function () {
-  clearTimeout(this.deliver_timeout_);
-
   this.watchers_.forEach(function (watcher) {
     watcher.dispose();
   });
 
   this.queue_ = [];
   this.watcher_queue_indexes_ = {};
+
+  this.delivery_observer_.close();
+  this.deliveries_ = 0;
+  this.delivery_observer_ = new PathObserver(this, 'deliveries_', this.deliver_, this);
 };
 
 
