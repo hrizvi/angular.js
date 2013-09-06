@@ -181,9 +181,9 @@ describe('$watch', function () {
       try {
         $watch.flush();
         throw Error('Should have thrown exception');
-      } catch (e) {
-        expect(e.message).toNotEqual('Maximum call stack size exceeded');
-        expect(e.message).toNotEqual('Should have thrown exception');
+      } catch (err) {
+        expect(err.message).toNotEqual('Maximum call stack size exceeded');
+        expect(err.message).toNotEqual('Should have thrown exception');
       }
     }));
 
@@ -204,8 +204,8 @@ describe('$watch', function () {
       try {
         $watch.flush();
         throw Error('Should have thrown exception');
-      } catch (e) {
-        expect(e.message).toNotEqual('Should have thrown exception');
+      } catch (err) {
+        expect(err.message).toNotEqual('Should have thrown exception');
         expect(obj.a).toBe(151);
       }
     }));
@@ -221,8 +221,8 @@ describe('$watch', function () {
       try {
         $watch.flush();
         throw Error('Should have thrown exception');
-      } catch (e) {
-        expect(e.message).toNotEqual('Should have thrown exception');
+      } catch (err) {
+        expect(err.message).toNotEqual('Should have thrown exception');
         expect(obj.a).toBe(100);
       }
 
@@ -231,8 +231,8 @@ describe('$watch', function () {
       try {
         $watch.flush();
         throw Error('Should have thrown exception');
-      } catch (e) {
-        expect(e.message).toNotEqual('Should have thrown exception');
+      } catch (err) {
+        expect(err.message).toNotEqual('Should have thrown exception');
         expect(obj.a).toBe(100);
       }
     }));
@@ -251,9 +251,9 @@ describe('$watch', function () {
       try {
         $watch.flush();
         throw Error('Should have thrown exception');
-      } catch (e) {
-        expect(e.message).toNotEqual('Should have thrown exception');
-        expect(e.message.match(/(noop|watcherA|function.*?obj\.(a|b))/gm).length).toBe(10);
+      } catch (err) {
+        expect(err.message).toNotEqual('Should have thrown exception');
+        expect(err.message.match(/fn: (watcherA|function.*?obj\.(a|b))/gm).length).toBe(10);
       }
     }));
   });

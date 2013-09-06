@@ -44,12 +44,12 @@ $WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep
 
   var desc = this.$parse.prepareObservable(exp);
   if (!desc.observable || desc.paths.length === 0) {
-    this.queueListener_(obj, listener, desc.get(), undefined);
+    this.queueListener_(obj, exp, listener, desc.get(), undefined);
     this.reportDelivery_();
     return noop;
   }
 
-  var watcher = this.addWatcher_(obj, desc, listener, deep_equal);
+  var watcher = this.addWatcher_(obj, exp, desc, listener, deep_equal);
 
   return function () {
     watcher.dispose();
@@ -67,9 +67,11 @@ $WatchProvider.WatchManager.prototype.subscribe = function (subscriber) {
 };
 
 
-$WatchProvider.WatchManager.prototype.queueListener_ = function (obj, listener, value, last) {
+$WatchProvider.WatchManager.prototype.queueListener_ =
+    function (obj, exp, listener, value, last) {
   var queue_item = {
     obj: obj,
+    exp: exp,
     watcher: null,
     listener: listener,
     value: value,
@@ -80,12 +82,14 @@ $WatchProvider.WatchManager.prototype.queueListener_ = function (obj, listener, 
 };
 
 
-$WatchProvider.WatchManager.prototype.queueWatcherListener_ = function (watcher, listener, value, last) {
+$WatchProvider.WatchManager.prototype.queueWatcherListener_ =
+    function (watcher, listener, value, last) {
   var index = this.watcher_queue_indexes_[watcher.$$id];
   delete this.queue_[index];
 
   var queue_item = {
     obj: watcher.$$obj,
+    exp: watcher.$$exp,
     watcher: watcher,
     listener: listener,
     value: value,
@@ -97,8 +101,9 @@ $WatchProvider.WatchManager.prototype.queueWatcherListener_ = function (watcher,
 };
 
 
-$WatchProvider.WatchManager.prototype.addWatcher_ = function (obj, desc, listener, deep_equal) {
-  var watcher = new $WatchProvider.Watcher(obj, desc.paths);
+$WatchProvider.WatchManager.prototype.addWatcher_ =
+    function (obj, exp, desc, listener, deep_equal) {
+  var watcher = new $WatchProvider.Watcher(obj, exp, desc.paths);
   var last_value = desc.get(obj);
 
   var self = this;
@@ -127,6 +132,7 @@ $WatchProvider.WatchManager.prototype.reportDelivery_ = function () {
 };
 
 
+// TODO: Refactor (method too long)
 $WatchProvider.WatchManager.prototype.deliver_ = function () {
   var queue = this.queue_;
   var watcher_indexes = this.watcher_queue_indexes_;
@@ -137,20 +143,7 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
     return;
   }
 
-  // TODO: extract the limit
-  if (this.depth_ >= 100) {
-    this.depth_ = 0;
-    var listener = queue[0].listener;
-    throw new Error(
-      'Recursion limit of 100 listener iterations reached.\n' +
-      'Last callbacks:\n  ' +
-      map(this.stack_.slice(0, 10), function (fn) {
-        return fn.name || fn.toString();
-      }).join('\n  ')
-    );
-  }
-
-  this.depth_ += 1;
+  var iteration_calls = [];
 
   while (queue_length--) {
     var item = queue.shift();
@@ -159,9 +152,14 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
         delete watcher_indexes[item.watcher.$$id];
       }
 
+      var listener = item.listener;
       try {
-        this.stack_.unshift(item.listener);
         item.listener.call(null, item.value, item.last_value, item.obj);
+        iteration_calls.push(
+          item.exp + '; ' +
+          'newVal: ' + toJson(item.value) + '; ' +
+          'oldVal: ' + toJson(item.last_value)
+        );
       } catch (err) {
         this.$exceptionHandler(err);
       }
@@ -170,12 +168,25 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
 
   forEach(this.subscribers_, function (subscriber) {
     try {
-      this.stack_.unshift(subscriber);
       subscriber();
+      iteration_calls.push('fn: ' + (subscriber.name || subscriber.toString()));
     } catch (err) {
       this.$exceptionHandler(err);
     }
   }, this);
+
+  this.depth_ += 1;
+  this.stack_.push(iteration_calls);
+
+  // TODO: extract the limit
+  if (this.depth_ >= 100) {
+    this.depth_ = 0;
+
+    throw new Error(
+      'Recursion limit of 100 delivery iterations reached.\n' +
+      'Calls in the last 5 iterations: ' + toJson(this.stack_.slice(-5))
+    );
+  }
 
   var self = this;
   this.depth_reset_timeout_ = setTimeout(function () {
@@ -226,13 +237,15 @@ $WatchProvider.WatchManager.prototype.disposeAll = function () {
 /**
  * @constructor
  * @param {!Object} obj The object on which to observe paths.
+ * @param {string} exp The watched expression.
  * @param {!Array.<string>} paths The paths to observe.
  */
-$WatchProvider.Watcher = function (obj, paths) {
+$WatchProvider.Watcher = function (obj, exp, paths) {
   var self = this;
 
   this.$$id = (++$WatchProvider.Watcher.prototype.$$id);
   this.$$obj = obj;
+  this.$$exp = exp;
 
   /**
    * @type {!Array.<!PathObserver>}
