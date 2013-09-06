@@ -423,5 +423,33 @@ describe('$watch', function () {
       $watch.flush();
       expect(count).toBe(0);
     }));
+
+
+    it('should return noop as the disposal function for watched constant expressions', inject(
+        function ($watch) {
+      var dispose = $watch(obj, '3', function () {});
+      expect(dispose).toBe(noop);
+    }));
+
+
+    it('should allow subscriber disposal via a returned function', inject(function ($watch) {
+      var count = 0;
+
+      obj.a = 3;
+      $watch(obj, 'a', noop);
+
+      var dispose = $watch.subscribe(function () {
+        count += 1;
+      });
+
+      $watch.flush();
+      count = 0;
+
+      dispose();
+      obj.a = 4;
+
+      $watch.flush();
+      expect(count).toBe(0);
+    }));
   });
 });
