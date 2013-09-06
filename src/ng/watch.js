@@ -29,7 +29,7 @@ $WatchProvider.WatchManager = function ($parse, $exceptionHandler) {
   this.queue_ = [];
   this.watcher_queue_indexes_ = {};
 
-  this.depth_ = 0;
+  this.stack_reset_timeout_ = 0;
   this.stack_ = [];
 
   this.deliveries_ = 0;
@@ -139,7 +139,7 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
 
   var queue_length = queue.length;
   if (queue_length === 0) {
-    this.depth_ = 0;
+    this.stack_.length = 0;
     return;
   }
 
@@ -175,29 +175,41 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
     }
   }, this);
 
-  this.depth_ += 1;
   this.stack_.push(iteration_calls);
 
   // TODO: extract the limit
-  if (this.depth_ >= 100) {
-    this.depth_ = 0;
+  if (this.stack_.length >= 100) {
+    var last_calls = this.stack_.slice(-5);
+    this.stack_.length = 0;
 
     throw new Error(
       'Recursion limit of 100 delivery iterations reached.\n' +
-      'Calls in the last 5 iterations: ' + toJson(this.stack_.slice(-5))
+      'Calls in the last 5 iterations: ' + toJson(last_calls)
     );
   }
 
   var self = this;
-  this.depth_reset_timeout_ = setTimeout(function () {
-    self.depth_reset_timeout_ = 0;
-    self.depth_ = 0;
+  this.stack_reset_timeout_ = setTimeout(function () {
+    self.stack_reset_timeout_ = 0;
     self.stack_.length = 0;
   }, 0);
 };
 
 
 $WatchProvider.WatchManager.prototype.flush = function () {
+  if (this.stack_.length > 0) {
+    throw new Error('$watch flush already in progress');
+  }
+
+  this.flush_();
+
+  clearTimeout(this.stack_reset_timeout_);
+  this.stack_reset_timeout_ = 0;
+  this.stack_.length = 0;
+};
+
+
+$WatchProvider.WatchManager.prototype.flush_ = function () {
   var delivers_before = this.deliveries_;
 
   this.watchers_.forEach(function (watcher) {
@@ -206,12 +218,8 @@ $WatchProvider.WatchManager.prototype.flush = function () {
 
   this.delivery_observer_.deliver();
   if (this.deliveries_ !== delivers_before) {
-    this.flush();
+    this.flush_();
   }
-
-  clearTimeout(this.depth_reset_timeout_);
-  this.depth_ = 0;
-  this.stack_.length = 0;
 };
 
 
@@ -219,6 +227,7 @@ $WatchProvider.WatchManager.prototype.disposeAll = function () {
   this.watchers_.forEach(function (watcher) {
     watcher.dispose();
   });
+  this.subscribers_ = [];
 
   this.queue_ = [];
   this.watcher_queue_indexes_ = {};
@@ -227,8 +236,8 @@ $WatchProvider.WatchManager.prototype.disposeAll = function () {
   this.deliveries_ = 0;
   this.delivery_observer_ = new $WatchProvider.PathObserver(this, 'deliveries_', this.deliver_, this);
 
-  clearTimeout(this.depth_reset_timeout_);
-  this.depth_ = 0;
+  clearTimeout(this.stack_reset_timeout_);
+  this.stack_reset_timeout_ = 0;
   this.stack_.length = 0;
 };
 
