@@ -45,7 +45,6 @@ $WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep
   var desc = this.$parse.prepareObservable(exp);
   if (!desc.observable || desc.paths.length === 0) {
     this.queueListener_(obj, exp, listener, desc.get(), undefined);
-    this.reportDelivery_();
     return noop;
   }
 
@@ -79,6 +78,7 @@ $WatchProvider.WatchManager.prototype.queueListener_ =
   };
 
   this.queue_.push(queue_item);
+  this.reportDelivery_();
 };
 
 
@@ -98,6 +98,8 @@ $WatchProvider.WatchManager.prototype.queueWatcherListener_ =
 
   var queue_length = this.queue_.push(queue_item);
   this.watcher_queue_indexes_[watcher.$$id] = queue_length - 1;
+
+  this.reportDelivery_();
 };
 
 
@@ -113,7 +115,6 @@ $WatchProvider.WatchManager.prototype.addWatcher_ =
     var value = desc.get(obj);
     if (!deep_equal || !equals(value, last_value)) {
       self.queueWatcherListener_(watcher, listener, value, last_value);
-      self.reportDelivery_();
     }
 
     last_value = deep_equal ? copy(value) : value;
@@ -121,7 +122,6 @@ $WatchProvider.WatchManager.prototype.addWatcher_ =
 
   this.watchers_.push(watcher);
   this.queueWatcherListener_(watcher, listener, last_value, undefined);
-  this.reportDelivery_();
 
   if (deep_equal) {
     last_value = copy(last_value);
@@ -131,7 +131,6 @@ $WatchProvider.WatchManager.prototype.addWatcher_ =
 };
 
 
-// TODO: watch queue length instead
 $WatchProvider.WatchManager.prototype.reportDelivery_ = function () {
   this.deliveries_ += 1;
 };
