@@ -130,7 +130,7 @@ describe('$watch', function () {
     obj.a = { x: 2, y: { a: 3, b: 4 }};
     $watch(obj, 'a', function (value, old_value) {
       count += 1;
-    }, true);
+    });
 
     $watch.flush();
     count = 0;
@@ -343,6 +343,26 @@ describe('$watch', function () {
 
       $watch.flush();
       expect(count).toBe(0);
+    }));
+
+
+    it('should consider changes to deeper levels changes', inject(function ($watch) {
+      var count = 0;
+
+      obj.a = { x: 2, y: { a: 3, b: 4 }};
+      $watch(obj, 'a', function (value, old_value) {
+        expect(value).toBe(obj.a);
+        count += 1;
+      }, true);
+
+      $watch.flush();
+      count = 0;
+
+      obj.a.x += 1;
+      obj.a.y.a += 1;
+
+      $watch.flush();
+      expect(count).toBe(1);
     }));
   });
 

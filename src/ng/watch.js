@@ -103,7 +103,7 @@ $WatchProvider.WatchManager.prototype.queueWatcherListener_ =
 
 $WatchProvider.WatchManager.prototype.addWatcher_ =
     function (obj, exp, desc, listener, deep_equal) {
-  var watcher = new $WatchProvider.Watcher(obj, exp, desc.paths);
+  var watcher = new $WatchProvider.Watcher(obj, exp, desc.paths, deep_equal);
   var last_value = desc.get(obj);
 
   var self = this;
@@ -116,17 +116,22 @@ $WatchProvider.WatchManager.prototype.addWatcher_ =
       self.reportDelivery_();
     }
 
-    last_value = value;
+    last_value = deep_equal ? copy(value) : value;
   };
 
   this.watchers_.push(watcher);
   this.queueWatcherListener_(watcher, listener, last_value, undefined);
   this.reportDelivery_();
 
+  if (deep_equal) {
+    last_value = copy(last_value);
+  }
+
   return watcher;
 };
 
 
+// TODO: watch queue length instead
 $WatchProvider.WatchManager.prototype.reportDelivery_ = function () {
   this.deliveries_ += 1;
 };
@@ -248,23 +253,40 @@ $WatchProvider.WatchManager.prototype.disposeAll = function () {
  * @param {!Object} obj The object on which to observe paths.
  * @param {string} exp The watched expression.
  * @param {!Array.<string>} paths The paths to observe.
+ * @param {boolean=} deep Whether to watch all levels.
  */
-$WatchProvider.Watcher = function (obj, exp, paths) {
-  var self = this;
-
+$WatchProvider.Watcher = function (obj, exp, paths, deep) {
   this.$$id = (++$WatchProvider.Watcher.prototype.$$id);
   this.$$obj = obj;
   this.$$exp = exp;
+  this.$$paths = paths;
+  this.$$deep = deep;
 
   /**
-   * @type {!Array.<!PathObserver>}
+   * @type {!Object.<string, !PathObserver>}
    */
-  this.observers = map(paths, function (path) {
-    var handlePathChange = function (value) {
+  this.root_observers = {};
+
+  /**
+   * @type {!Object.<string, {
+   *   root_observer: !ObjectObserver,
+   *   child_observers: Object
+   * }>}
+   */
+  this.child_observers = {};
+
+  forEach(paths, function (path) {
+    var self = this;
+    var handlePathChange = function () {
       self.handlePathChange_(path);
     };
-    return new $WatchProvider.PathObserver(obj, path, handlePathChange);
-  });
+    this.root_observers[path] = new $WatchProvider.PathObserver(obj, path, handlePathChange);
+
+    if (deep) {
+      var path_value = this.root_observers[path].value;
+      this.child_observers[path] = this.watchChildren_(path_value, handlePathChange);
+    }
+  }, this);
 };
 
 
@@ -279,24 +301,72 @@ $WatchProvider.Watcher.prototype.handlePathChange_ = function (changed_path) {
 };
 
 
+$WatchProvider.Watcher.prototype.watchChildren_ = function (root_value, onchange) {
+  var root_observer = new $WatchProvider.ObjectObserver(root_value, onchange, this);
+
+  var child_observers = {};
+  forEach(root_value, function (child_value, child_key) {
+    if (isObject(child_value)) {
+      child_observers[child_key] = this.watchChildren_(child_value, onchange);
+    }
+  }, this);
+
+  return {
+    root_observer: root_observer,
+    child_observers: child_observers
+  };
+};
+
+
 $WatchProvider.Watcher.prototype.flush = function () {
-  forEach(this.observers, function (observer) {
+  forEach(this.root_observers, function (observer) {
     observer.deliver();
   });
+
+  var deliverChildChanges = function (child_observers) {
+    forEach(child_observers, function (tuple, key) {
+      tuple.root_observer.deliver();
+      deliverChildChanges(tuple.child_observers);
+    });
+  };
+
+  deliverChildChanges(this.child_observers);
 };
 
 
 $WatchProvider.Watcher.prototype.dispose = function () {
-  forEach(this.observers, function (observer) {
+  forEach(this.root_observers, function (observer) {
     observer.close();
   });
 
-  this.observers.length = 0;
+  this.root_observers.length = 0;
 };
 
 
 
 /**
+ * Polymer/observe-js ObjectObserver extension that does not catch exceptions
+ * @constructor
+ * @extends {PathObserver}
+ */
+$WatchProvider.ObjectObserver = function () {
+  ObjectObserver.apply(this, Array.prototype.slice.call(arguments));
+};
+
+inherits($WatchProvider.ObjectObserver, ObjectObserver);
+
+
+/**
+ * @override
+ */
+$WatchProvider.ObjectObserver.prototype.invokeCallback = function (args) {
+  this.callback.apply(this.target, args);
+};
+
+
+
+/**
+ * Polymer/observe-js PathObserver extension that does not catch exceptions
  * @constructor
  * @extends {PathObserver}
  */
