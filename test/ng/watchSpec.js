@@ -1,17 +1,19 @@
 
 describe('$watch', function () {
-  var obj;
+  var obj = {};
 
   beforeEach(function () {
     module(function ($exceptionHandlerProvider) {
       $exceptionHandlerProvider.mode('log');
     });
-
-    inject(function ($watch) {
-      $watch.disposeAll();
-      obj = {};
-    });
   });
+
+
+  afterEach(inject(function ($watch) {
+    $watch.disposeAll();
+    obj = {};
+  }));
+
 
   it('should call listener after registration', inject(function ($watch) {
     var watch_value;
