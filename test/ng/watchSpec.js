@@ -37,7 +37,6 @@ describe('$watch', function () {
     });
 
     obj.a = 5;
-
     $watch.flush();
     expect(watch_value).toBe(5);
   }));
@@ -52,7 +51,6 @@ describe('$watch', function () {
     });
 
     obj.a.b.c = 5;
-
     $watch.flush();
     expect(watch_value).toBe(5);
   }));
@@ -118,7 +116,6 @@ describe('$watch', function () {
     count = 0;
 
     obj.a = NaN;
-
     $watch.flush();
     expect(count).toBe(0);
   }));
@@ -137,7 +134,6 @@ describe('$watch', function () {
 
     obj.a.x = 3;
     obj.a.y.a = 5;
-
     $watch.flush();
     expect(count).toBe(0);
   }));
@@ -179,7 +175,6 @@ describe('$watch', function () {
       $watch.subscribe(function () { obj.a += 1; });
 
       obj.a = 0;
-
       try {
         $watch.flush();
         throw Error('Should have thrown exception');
@@ -219,7 +214,6 @@ describe('$watch', function () {
       $watch.subscribe(function () { obj.a += 1; });
 
       obj.a = 0;
-
       try {
         $watch.flush();
         throw Error('Should have thrown exception');
@@ -229,7 +223,6 @@ describe('$watch', function () {
       }
 
       obj.a = 0;
-
       try {
         $watch.flush();
         throw Error('Should have thrown exception');
@@ -249,7 +242,6 @@ describe('$watch', function () {
 
       obj.a = 0;
       obj.b = 0;
-
       try {
         $watch.flush();
         throw Error('Should have thrown exception');
@@ -279,12 +271,11 @@ describe('$watch', function () {
 
       $watch.flush();
       expect(log).toEqual('ab1c2');
+      log = '';
 
       obj.c = 2;
       obj.a = 2;
       obj.b = 2;
-
-      log = '';
       $watch.flush();
       expect(log).toEqual('abc');
     }));
@@ -301,7 +292,6 @@ describe('$watch', function () {
       $watch.subscribe(function() { log += 'c'; });
 
       obj.a = 2;
-
       $watch.flush();
       expect(log).toEqual('abc');
     }));
@@ -319,7 +309,6 @@ describe('$watch', function () {
       $watch.subscribe(function() { log += 'e'; });
 
       obj.a = 2;
-
       $watch.flush();
       expect(log).toEqual('abcde');
     }));
@@ -340,7 +329,6 @@ describe('$watch', function () {
       count = 0;
 
       obj.a = { x: 2, y: { a: 3, b: 4 }};
-
       $watch.flush();
       expect(count).toBe(0);
     }));
@@ -381,7 +369,6 @@ describe('$watch', function () {
       count = 0;
 
       obj.a = 4;
-
       $watch.flush();
       expect(count).toBe(1);
     }));
@@ -420,7 +407,6 @@ describe('$watch', function () {
 
       obj.a = 4;
       obj.b = 5;
-
       $watch.flush();
       expect(count).toBe(1);
     }));
@@ -441,7 +427,6 @@ describe('$watch', function () {
 
       dispose();
       obj.a = 4;
-
       $watch.flush();
       expect(count).toBe(0);
     }));
@@ -469,7 +454,6 @@ describe('$watch', function () {
 
       dispose();
       obj.a = 4;
-
       $watch.flush();
       expect(count).toBe(0);
     }));
