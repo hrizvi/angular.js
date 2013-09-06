@@ -260,8 +260,7 @@ describe('$watch', function () {
 
 
   describe('ordering', function () {
-    it('should fire watches in order of addition', inject(function($watch) {
-      // this is not an external guarantee, just our own sanity
+    it('should call watcher listeners in order of addition', inject(function ($watch) {
       var log = '';
 
       obj.a = 1;
@@ -286,6 +285,41 @@ describe('$watch', function () {
       log = '';
       $watch.flush();
       expect(log).toEqual('abc');
+    }));
+
+
+    it('should call subscribers in order of addition', inject(function ($watch) {
+      var log = '';
+
+      obj.a = 1;
+
+      $watch(obj, 'a', noop);
+      $watch.subscribe(function() { log += 'a'; });
+      $watch.subscribe(function() { log += 'b'; });
+      $watch.subscribe(function() { log += 'c'; });
+
+      obj.a = 2;
+
+      $watch.flush();
+      expect(log).toEqual('abc');
+    }));
+
+
+    it('should call subscribers after watcher listeners', inject(function ($watch) {
+      var log = '';
+
+      obj.a = 1;
+
+      $watch.subscribe(function() { log += 'c'; });
+      $watch(obj, 'a', function () { log += 'a'; });
+      $watch.subscribe(function() { log += 'd'; });
+      $watch(obj, 'a', function () { log += 'b'; });
+      $watch.subscribe(function() { log += 'e'; });
+
+      obj.a = 2;
+
+      $watch.flush();
+      expect(log).toEqual('abcde');
     }));
   });
 
