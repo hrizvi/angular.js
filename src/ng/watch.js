@@ -29,8 +29,11 @@ $WatchProvider.WatchManager = function ($parse, $exceptionHandler) {
   this.queue_ = [];
   this.watcher_queue_indexes_ = {};
 
+  this.depth_ = 0;
+  this.stack_ = [];
+
   this.deliveries_ = 0;
-  this.delivery_observer_ = new PathObserver(this, 'deliveries_', this.deliver_, this);
+  this.delivery_observer_ = new $WatchProvider.PathObserver(this, 'deliveries_', this.deliver_, this);
 };
 
 
@@ -130,8 +133,24 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
 
   var queue_length = queue.length;
   if (queue_length === 0) {
+    this.depth_ = 0;
     return;
   }
+
+  // TODO: extract the limit
+  if (this.depth_ >= 100) {
+    this.depth_ = 0;
+    var listener = queue[0].listener;
+    throw new Error(
+      'Recursion limit of 100 listener iterations reached.\n' +
+      'Last callbacks:\n  ' +
+      map(this.stack_.slice(0, 10), function (fn) {
+        return fn.name || fn.toString();
+      }).join('\n  ')
+    );
+  }
+
+  this.depth_ += 1;
 
   while (queue_length--) {
     var item = queue.shift();
@@ -141,6 +160,7 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
       }
 
       try {
+        this.stack_.unshift(item.listener);
         item.listener.call(null, item.value, item.last_value, item.obj);
       } catch (err) {
         this.$exceptionHandler(err);
@@ -150,11 +170,19 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
 
   forEach(this.subscribers_, function (subscriber) {
     try {
+      this.stack_.unshift(subscriber);
       subscriber();
     } catch (err) {
       this.$exceptionHandler(err);
     }
   }, this);
+
+  var self = this;
+  this.depth_reset_timeout_ = setTimeout(function () {
+    self.depth_reset_timeout_ = 0;
+    self.depth_ = 0;
+    self.stack_.length = 0;
+  }, 0);
 };
 
 
@@ -169,6 +197,10 @@ $WatchProvider.WatchManager.prototype.flush = function () {
   if (this.deliveries_ !== delivers_before) {
     this.flush();
   }
+
+  clearTimeout(this.depth_reset_timeout_);
+  this.depth_ = 0;
+  this.stack_.length = 0;
 };
 
 
@@ -182,7 +214,11 @@ $WatchProvider.WatchManager.prototype.disposeAll = function () {
 
   this.delivery_observer_.close();
   this.deliveries_ = 0;
-  this.delivery_observer_ = new PathObserver(this, 'deliveries_', this.deliver_, this);
+  this.delivery_observer_ = new $WatchProvider.PathObserver(this, 'deliveries_', this.deliver_, this);
+
+  clearTimeout(this.depth_reset_timeout_);
+  this.depth_ = 0;
+  this.stack_.length = 0;
 };
 
 
@@ -205,7 +241,7 @@ $WatchProvider.Watcher = function (obj, paths) {
     var handlePathChange = function (value) {
       self.handlePathChange_(path);
     };
-    return new PathObserver(obj, path, handlePathChange);
+    return new $WatchProvider.PathObserver(obj, path, handlePathChange);
   });
 };
 
@@ -234,4 +270,24 @@ $WatchProvider.Watcher.prototype.dispose = function () {
   });
 
   this.observers.length = 0;
+};
+
+
+
+/**
+ * @constructor
+ * @extends {PathObserver}
+ */
+$WatchProvider.PathObserver = function () {
+  PathObserver.apply(this, Array.prototype.slice.call(arguments));
+};
+
+inherits($WatchProvider.PathObserver, PathObserver);
+
+
+/**
+ * @override
+ */
+$WatchProvider.PathObserver.prototype.invokeCallback = function (args) {
+  this.callback.apply(this.target, args);
 };

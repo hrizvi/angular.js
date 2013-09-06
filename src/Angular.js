@@ -266,6 +266,15 @@ function inherit(parent, extra) {
   return extend(new (extend(function() {}, {prototype:parent}))(), extra);
 }
 
+
+function inherits(Child, Parent) {
+  var Constructor = function () {};
+  Constructor.prototype = Parent.prototype;
+
+  Child.prototype = new Constructor();
+  Child.prototype.constructor = Child;
+}
+
 /**
  * @ngdoc function
  * @name angular.noop

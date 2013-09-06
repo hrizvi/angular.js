@@ -170,6 +170,95 @@ describe('$watch', function () {
   });
 
 
+  describe('recursion control', function () {
+    it('should prevent infinite recursion', inject(
+        function ($watch) {
+      $watch(obj, 'a', noop);
+      $watch.subscribe(function () { obj.a += 1; });
+
+      obj.a = 0;
+
+      try {
+        $watch.flush();
+        throw Error('Should have thrown exception');
+      } catch (e) {
+        expect(e.message).toNotEqual('Maximum call stack size exceeded');
+        expect(e.message).toNotEqual('Should have thrown exception');
+      }
+    }));
+
+
+    it('should reset recursion counter when idle', inject(function ($watch) {
+      $watch(obj, 'a', noop);
+      $watch.subscribe(function () {
+        if (obj.a !== 50) {
+          obj.a += 1;
+        }
+      });
+
+      obj.a = 0;
+      $watch.flush();
+      expect(obj.a).toBe(50);
+
+      obj.a += 1;
+      try {
+        $watch.flush();
+        throw Error('Should have thrown exception');
+      } catch (e) {
+        expect(e.message).toNotEqual('Should have thrown exception');
+        expect(obj.a).toBe(151);
+      }
+    }));
+
+
+    it('should reset recursion counter when the recursion limit is reached', inject(
+        function ($watch) {
+      $watch(obj, 'a', noop);
+      $watch.subscribe(function () { obj.a += 1; });
+
+      obj.a = 0;
+
+      try {
+        $watch.flush();
+        throw Error('Should have thrown exception');
+      } catch (e) {
+        expect(e.message).toNotEqual('Should have thrown exception');
+        expect(obj.a).toBe(100);
+      }
+
+      obj.a = 0;
+
+      try {
+        $watch.flush();
+        throw Error('Should have thrown exception');
+      } catch (e) {
+        expect(e.message).toNotEqual('Should have thrown exception');
+        expect(obj.a).toBe(100);
+      }
+    }));
+
+
+    it('should print names or bodies of the last 10 listeners/subscribers on limit', inject(
+        function ($watch) {
+      $watch(obj, 'a', noop);
+      $watch(obj, 'b', noop);
+      $watch.subscribe(function watcherA() { obj.b += 1; });
+      $watch.subscribe(function () { obj.a += 1; });
+
+      obj.a = 0;
+      obj.b = 0;
+
+      try {
+        $watch.flush();
+        throw Error('Should have thrown exception');
+      } catch (e) {
+        expect(e.message).toNotEqual('Should have thrown exception');
+        expect(e.message.match(/(noop|watcherA|function.*?obj\.(a|b))/gm).length).toBe(10);
+      }
+    }));
+  });
+
+
   describe('ordering', function () {
     it('should fire watches in order of addition', inject(function($watch) {
       // this is not an external guarantee, just our own sanity

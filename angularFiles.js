@@ -1,5 +1,6 @@
 angularFiles = {
   'angularSrc': [
+    'bower_components/observe.js/src/observe.js',
     'src/minErr.js',
     'src/Angular.js',
     'src/loader.js',
@@ -80,7 +81,6 @@ angularFiles = {
     'src/ngTouch/swipe.js',
     'src/ngTouch/directive/ngClick.js',
     'src/ngTouch/directive/ngSwipe.js',
-    'bower_components/observe.js/src/observe.js',
     'docs/components/angular-bootstrap/bootstrap.js',
   ],
 
