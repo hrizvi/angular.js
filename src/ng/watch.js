@@ -84,12 +84,12 @@ $WatchProvider.WatchManager.prototype.queueListener_ =
 
 $WatchProvider.WatchManager.prototype.queueWatcherListener_ =
     function (watcher, listener, value, last) {
-  var index = this.watcher_queue_indexes_[watcher.$$id];
+  var index = this.watcher_queue_indexes_[watcher.id];
   delete this.queue_[index];
 
   var queue_item = {
-    obj: watcher.$$obj,
-    exp: watcher.$$exp,
+    obj: watcher.root,
+    exp: watcher.exp,
     watcher: watcher,
     listener: listener,
     value: value,
@@ -97,7 +97,7 @@ $WatchProvider.WatchManager.prototype.queueWatcherListener_ =
   };
 
   var queue_length = this.queue_.push(queue_item);
-  this.watcher_queue_indexes_[watcher.$$id] = queue_length - 1;
+  this.watcher_queue_indexes_[watcher.id] = queue_length - 1;
 
   this.reportDelivery_();
 };
@@ -153,7 +153,7 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
     var item = queue.shift();
     if (item) {
       if (item.watcher) {
-        delete watcher_indexes[item.watcher.$$id];
+        delete watcher_indexes[item.watcher.id];
       }
 
       var listener = item.listener;
@@ -255,11 +255,11 @@ $WatchProvider.WatchManager.prototype.disposeAll = function () {
  * @param {boolean=} deep Whether to watch all levels.
  */
 $WatchProvider.Watcher = function (obj, exp, paths, deep) {
-  this.$$id = (++$WatchProvider.Watcher.prototype.$$id);
-  this.$$obj = obj;
-  this.$$exp = exp;
-  this.$$paths = paths;
-  this.$$deep = deep;
+  this.id = (++$WatchProvider.Watcher.prototype.id);
+  this.obj = obj;
+  this.exp = exp;
+  this.paths_ = paths;
+  this.deep_ = !!deep;
 
   /**
    * @type {!Object.<string, !PathObserver>}
@@ -289,7 +289,7 @@ $WatchProvider.Watcher = function (obj, exp, paths, deep) {
 };
 
 
-$WatchProvider.Watcher.prototype.$$id = 0;
+$WatchProvider.Watcher.prototype.id = 0;
 
 
 $WatchProvider.Watcher.prototype.onchange = noop;
