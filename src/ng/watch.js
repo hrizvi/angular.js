@@ -44,7 +44,8 @@ $WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep
 
   var desc = this.$parse.prepareObservable(exp);
   if (!desc.observable || desc.paths.length === 0) {
-    this.queueListener_(obj, exp, listener, desc.get(), undefined);
+    var value = desc.get();
+    this.queueListener_(obj, exp, listener, value, value);
     return noop;
   }
 
@@ -121,7 +122,7 @@ $WatchProvider.WatchManager.prototype.addWatcher_ =
   };
 
   this.watchers_.push(watcher);
-  this.queueWatcherListener_(watcher, listener, last_value, undefined);
+  this.queueWatcherListener_(watcher, listener, last_value, last_value);
 
   if (deep_equal) {
     last_value = copy(last_value);

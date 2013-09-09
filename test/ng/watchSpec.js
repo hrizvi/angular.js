@@ -28,6 +28,33 @@ describe('$watch', function () {
   }));
 
 
+  it('should call listeners with the same "new value" and "old value" arguments on registration',
+      inject(function ($watch) {
+    var watch_value;
+    var watch_old_value;
+    var watch_ref;
+    var watch_old_ref;
+
+    obj.a = 3;
+    obj.b = {};
+
+    $watch(obj, 'a', function (value, old_value) {
+      watch_value = value;
+      watch_old_value = old_value;
+    });
+    $watch(obj, 'b', function (ref, old_ref) {
+      watch_ref = ref;
+      watch_old_ref = old_ref;
+    });
+
+    $watch.flush();
+    expect(watch_value).toBe(3);
+    expect(watch_old_value).toBe(3);
+    expect(watch_ref).toBe(obj.b);
+    expect(watch_old_ref).toBe(obj.b);
+  }));
+
+
   it('should watch scope keys', inject(function ($watch) {
     var watch_value;
 
