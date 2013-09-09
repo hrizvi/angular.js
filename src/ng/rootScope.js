@@ -113,10 +113,17 @@ function $RootScopeProvider(){
      */
     function Scope() {
       this.$id = nextUid();
-      this.$$phase = this.$parent = this.$$watchers =
-                     this.$$nextSibling = this.$$prevSibling =
-                     this.$$childHead = this.$$childTail = null;
+      this.$parent = null;
+
+      this.$$phase = null;
+      this.$$watchers = null;
+      this.$$nextSibling = null;
+      this.$$prevSibling = null;
+      this.$$childHead = null;
+      this.$$childTail = null;
+
       this['this'] = this.$root =  this;
+
       this.$$destroyed = false;
       this.$$asyncQueue = [];
       this.$$postDigestQueue = [];
@@ -181,7 +188,10 @@ function $RootScopeProvider(){
         child['this'] = child;
         child.$$listeners = {};
         child.$parent = this;
-        child.$$watchers = child.$$nextSibling = child.$$childHead = child.$$childTail = null;
+        child.$$watchers = null;
+        child.$$nextSibling = null;
+        child.$$childHead = null;
+        child.$$childTail = null;
         child.$$prevSibling = this.$$childTail;
         if (this.$$childHead) {
           this.$$childTail.$$nextSibling = child;
