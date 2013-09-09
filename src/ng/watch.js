@@ -193,10 +193,12 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
   }
 
   var self = this;
-  this.stack_reset_timeout_ = setTimeout(function () {
-    self.stack_reset_timeout_ = 0;
-    self.stack_.length = 0;
-  }, 0);
+  if (!this.stack_reset_timeout_) {
+    this.stack_reset_timeout_ = setTimeout(function () {
+      self.stack_reset_timeout_ = 0;
+      self.stack_.length = 0;
+    }, 0);
+  }
 };
 
 
