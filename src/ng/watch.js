@@ -249,14 +249,14 @@ $WatchProvider.WatchManager.prototype.disposeAll = function () {
 
 /**
  * @constructor
- * @param {!Object} obj The object on which to observe paths.
+ * @param {!Object} root The object on which to observe paths.
  * @param {string} exp The watched expression.
  * @param {!Array.<string>} paths The paths to observe.
  * @param {boolean=} deep Whether to watch all levels.
  */
-$WatchProvider.Watcher = function (obj, exp, paths, deep) {
+$WatchProvider.Watcher = function (root, exp, paths, deep) {
   this.id = (++$WatchProvider.Watcher.prototype.id);
-  this.obj = obj;
+  this.root = root;
   this.exp = exp;
   this.paths_ = paths;
   this.deep_ = !!deep;
@@ -268,22 +268,41 @@ $WatchProvider.Watcher = function (obj, exp, paths, deep) {
 
   /**
    * @type {!Object.<string, {
-   *   root_observer: !ObjectObserver,
+   *   node_observer: !ObjectObserver,
    *   child_observers: Object
    * }>}
    */
   this.child_observers = {};
 
-  forEach(paths, function (path) {
-    var self = this;
-    var handlePathChange = function () {
-      self.handlePathChange_(path);
-    };
-    this.root_observers[path] = new $WatchProvider.PathObserver(obj, path, handlePathChange);
+  this.init();
+};
 
-    if (deep) {
-      var path_value = this.root_observers[path].value;
-      this.child_observers[path] = this.watchChildren_(path_value, handlePathChange);
+
+$WatchProvider.Watcher.prototype.init = function () {
+  forEach(this.paths_, function (path) {
+    var handleChange = function (new_value) {
+      this.handlePathChange_(path);
+
+      if (this.deep_) {
+        this.closeObserverTree_(this.child_observers[path]);
+        if (isObject(new_value)) {
+          this.child_observers[path] = this.watchChildren_(new_value, handleChildChange);
+        }
+      }
+    };
+
+    var handleChildChange = function () {
+      this.handlePathChange_(path);
+    };
+
+    var root_observer = new $WatchProvider.PathObserver(this.root, path, handleChange, this);
+    this.root_observers[path] = root_observer;
+
+    if (this.deep_) {
+      var path_value = root_observer.value;
+      if (isObject(path_value)) {
+        this.child_observers[path] = this.watchChildren_(path_value, handleChildChange);
+      }
     }
   }, this);
 };
@@ -301,7 +320,35 @@ $WatchProvider.Watcher.prototype.handlePathChange_ = function (changed_path) {
 
 
 $WatchProvider.Watcher.prototype.watchChildren_ = function (root_value, onchange) {
-  var root_observer = new $WatchProvider.ObjectObserver(root_value, onchange, this);
+  var handleChildChange = function (added, removed, changed) {
+    forEach(added, function (child_value, key) {
+      if (isObject(child_value)) {
+        child_observers[key] = this.watchChildren_(child_value, onchange);
+      }
+    }, this);
+
+    forEach(removed, function (child_value, key) {
+      if (child_observers[key]) {
+        this.closeObserverTree_(child_observers[key]);
+        delete child_observers[key];
+      }
+    }, this);
+
+    forEach(changed, function (child_value, key) {
+      if (child_observers[key]) {
+        this.closeObserverTree_(child_observers[key]);
+      }
+      if (isObject(child_value)) {
+        child_observers[key] = this.watchChildren_(child_value, onchange);
+      } else {
+        delete child_observers[key];
+      }
+    }, this);
+
+    onchange.call(this, root_value);
+  };
+
+  var node_observer = new $WatchProvider.ObjectObserver(root_value, handleChildChange, this);
 
   var child_observers = {};
   forEach(root_value, function (child_value, child_key) {
@@ -311,9 +358,15 @@ $WatchProvider.Watcher.prototype.watchChildren_ = function (root_value, onchange
   }, this);
 
   return {
-    root_observer: root_observer,
+    node_observer: node_observer,
     child_observers: child_observers
   };
+};
+
+
+$WatchProvider.Watcher.prototype.closeObserverTree_ = function (tuple) {
+  tuple.node_observer.close();
+  forEach(tuple.child_observers, this.closeObserverTree_);
 };
 
 
@@ -322,14 +375,16 @@ $WatchProvider.Watcher.prototype.flush = function () {
     observer.deliver();
   });
 
-  var deliverChildChanges = function (child_observers) {
-    forEach(child_observers, function (tuple, key) {
-      tuple.root_observer.deliver();
-      deliverChildChanges(tuple.child_observers);
-    });
-  };
+  if (this.deep_) {
+    var deliverChildChanges = function (child_observers) {
+      forEach(child_observers, function (tuple, key) {
+        tuple.node_observer.deliver();
+        deliverChildChanges(tuple.child_observers);
+      });
+    };
 
-  deliverChildChanges(this.child_observers);
+    deliverChildChanges(this.child_observers);
+  }
 };
 
 
@@ -339,6 +394,7 @@ $WatchProvider.Watcher.prototype.dispose = function () {
   });
 
   this.root_observers.length = 0;
+  this.child_observers = {};
 };
 
 

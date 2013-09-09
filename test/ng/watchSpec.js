@@ -348,9 +348,110 @@ describe('$watch', function () {
 
       obj.a.x += 1;
       obj.a.y.a += 1;
-
       $watch.flush();
       expect(count).toBe(1);
+    }));
+
+
+    it('should stop observing descendants when removed from the tree', inject(function ($watch) {
+      var count = 0;
+
+      var descendant = { a: 3, b: 4 };
+      obj.a = { x: 2, y: descendant };
+      $watch(obj, 'a', function (value, old_value) {
+        count += 1;
+      }, true);
+
+      $watch.flush();
+      count = 0;
+
+      descendant.a += 1;
+      $watch.flush();
+      expect(count).toBe(1);
+
+      obj.a.y = null;
+      $watch.flush();
+      expect(count).toBe(2);
+
+      descendant.a += 1;
+      $watch.flush();
+      expect(count).toBe(2);
+
+      var old = obj.a;
+      obj.a = null;
+      $watch.flush();
+      expect(count).toBe(3);
+
+      old.x += 1;
+      $watch.flush();
+      expect(count).toBe(3);
+    }));
+
+
+    it('should stop observing direct descendants when removed from the tree', inject(
+        function ($watch) {
+      var count = 0;
+
+      var descendant = { a: 3, b: 4 };
+      obj.a = descendant;
+
+      $watch(obj, 'a', function (value, old_value) {
+        count += 1;
+      }, true);
+
+      $watch.flush();
+      count = 0;
+
+      descendant.a += 1;
+      $watch.flush();
+      expect(count).toBe(1);
+
+      obj.a = null;
+      $watch.flush();
+      expect(count).toBe(2);
+
+      descendant.a += 1;
+      $watch.flush();
+      expect(count).toBe(2);
+    }));
+
+
+    it('should start observing descendants added to the tree', inject(function ($watch) {
+      var count = 0;
+
+      var descendant1 = { a: 3, b: 4, id: 1 };
+      var descendant2 = { a: 3, b: 4, id: 2 };
+      obj.a = { x: 2, y: null };
+      $watch(obj, 'a', function (value, old_value) {
+        count += 1;
+      }, true);
+
+      $watch.flush();
+      count = 0;
+
+      obj.a.y = descendant1;
+      $watch.flush();
+      expect(count).toBe(1);
+
+      obj.a.z = descendant2;
+      $watch.flush();
+      expect(count).toBe(2);
+
+      descendant1.a += 1;
+      $watch.flush();
+      expect(count).toBe(3);
+
+      descendant2.a += 1;
+      $watch.flush();
+      expect(count).toBe(4);
+
+      obj.a = { y: 5 };
+      $watch.flush();
+      expect(count).toBe(5);
+
+      obj.a.y += 1;
+      $watch.flush();
+      expect(count).toBe(6);
     }));
   });
 
