@@ -148,6 +148,7 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
   }
 
   var iteration_calls = [];
+  this.stack_.push(iteration_calls);
 
   while (queue_length--) {
     var item = queue.shift();
@@ -178,8 +179,6 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
       this.$exceptionHandler(err);
     }
   }, this);
-
-  this.stack_.push(iteration_calls);
 
   // TODO: extract the limit
   if (this.stack_.length >= 100) {
