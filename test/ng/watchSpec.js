@@ -28,6 +28,20 @@ describe('$watch', function () {
   }));
 
 
+  it('should not call subscribers after listener registration', inject(function ($watch) {
+    var count = 0;
+
+    obj.a = 3;
+    $watch(obj, 'a', noop);
+    $watch.subscribe(function () {
+      count += 1;
+    });
+
+    $watch.flush();
+    expect(count).toBe(0);
+  }));
+
+
   it('should call listeners with the same "new value" and "old value" arguments on registration',
       inject(function ($watch) {
     var watch_value;
@@ -226,6 +240,45 @@ describe('$watch', function () {
     }));
 
 
+    it('should loop on a $evalAsync call from a listener', inject(function ($watch) {
+      var count = 0;
+
+      obj.a = 3;
+
+      $watch(obj, 'a', function (value, old_value) {
+        count += 1;
+        $watch.evalAsync(function () {
+          count += 1;
+        });
+      });
+
+      $watch.flush();
+      expect(count).toBe(2);
+    }));
+
+
+    it('should loop on a $evalAsync call from a subscriber', inject(function ($watch) {
+      var count = 0;
+
+      obj.a = 3;
+
+      $watch(obj, 'a', noop);
+      $watch.subscribe(function () {
+        count += 1;
+        $watch.evalAsync(function () {
+          count += 1;
+        });
+      });
+
+      $watch.flush();
+      count = 0;
+
+      obj.a = 5;
+      $watch.flush();
+      expect(count).toBe(2);
+    }));
+
+
     it('should trigger path observers', inject(function ($watch) {
       var count = 0;
       var watch_value;
@@ -248,6 +301,21 @@ describe('$watch', function () {
       $watch.flush();
       expect(count).toBe(2);
       expect(watch_value).toBe(5);
+    }));
+
+
+    it('should not trigger subscriber calls if no observed value changes', inject(
+        function ($watch) {
+      var log = '';
+
+      obj.a = 3;
+
+      $watch(obj, 'a', noop);
+      $watch.subscribe(function () { log += 'b'; });
+      $watch.evalAsync(function () { log += 'a'; });
+
+      $watch.flush();
+      expect(log).toBe('a');
     }));
   });
 
@@ -274,6 +342,9 @@ describe('$watch', function () {
         throw new Error('abc');
       });
 
+      $watch.flush();
+
+      obj.a = 5;
       $watch.flush();
       expect($exceptionHandler.errors[0].message).toEqual('abc');
       $log.assertEmpty();
@@ -410,6 +481,18 @@ describe('$watch', function () {
     }));
 
 
+    it('should call $evalAsync callbacks in order of addition', inject(function ($watch) {
+      var log = '';
+
+      $watch.evalAsync(function() { log += 'a'; });
+      $watch.evalAsync(function() { log += 'b'; });
+      $watch.evalAsync(function() { log += 'c'; });
+
+      $watch.flush();
+      expect(log).toEqual('abc');
+    }));
+
+
     it('should call subscribers after watcher listeners', inject(function ($watch) {
       var log = '';
 
@@ -424,6 +507,84 @@ describe('$watch', function () {
       obj.a = 2;
       $watch.flush();
       expect(log).toEqual('abcde');
+    }));
+
+
+    it('should call $evalAsync callbacks before $watch listeners/subscribers', inject(function ($watch) {
+      var log = '';
+
+      obj.b = 3;
+
+      $watch(obj, 'b', function () { log += 'b'; });
+      $watch.subscribe(function () { log += 'b'; });
+
+      $watch.flush();
+      log = '';
+
+      obj.b = 5;
+      $watch.evalAsync(function () { log += 'a'; });
+      $watch.evalAsync(function () { log += 'a'; });
+
+      $watch.flush();
+      expect(log).toBe('aabb');
+    }));
+
+
+    it('should interlace $evalAsync callback and $watch listeners/subscribers calls', inject(
+        function ($watch) {
+      var log = '';
+
+      obj.b = 3;
+
+      $watch.evalAsync(function () {
+        log += 'a';
+        obj.b = 4;
+        $watch.evalAsync(function () {
+          log += 'b';
+          $watch.evalAsync(function () {
+            log += 'c';
+          });
+        });
+      });
+      $watch(obj, 'b', function () { log += '.'; });
+      $watch.subscribe(function () { log += '/'; });
+
+      $watch.flush();
+      expect(log).toBe('a.b./c');
+    }));
+
+
+    it('should not interlace $evalAsync callbacks registered in one delivery iteration with', inject(
+        function ($watch) {
+      var log = '';
+
+      obj.b = 3;
+      $watch(obj, 'b', function () {
+        log += 'b';
+        $watch.evalAsync(function () {
+          log += 'd';
+        });
+      });
+      $watch.subscribe(function () {
+        log += 'c';
+        $watch.evalAsync(function () {
+          log += 'd';
+        });
+      });
+
+      $watch.flush();
+      log = '';
+
+      obj.b = 5;
+      $watch.evalAsync(function () {
+        log += 'a';
+        $watch.evalAsync(function () {
+          log += 'd';
+        });
+      });
+
+      $watch.flush();
+      expect(log).toBe('abcddd');
     }));
   });
 

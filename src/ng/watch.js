@@ -41,6 +41,8 @@ $WatchProvider.WatchManager = function ($parse, $exceptionHandler) {
   this.deliveries_ = 0;
   this.delivery_observer_ = new $WatchProvider.PathObserver(
       this, 'deliveries_', this.deliver_, this);
+
+  this.got_changes_ = false;
 };
 
 
@@ -140,6 +142,7 @@ $WatchProvider.WatchManager.prototype.addWatcher_ =
 
     var value = desc.get(obj);
     if (!deep_equal || !equals(value, last_value)) {
+      self.got_changes_ = true;
       self.queueWatcherListener_(watcher, listener, value, last_value);
     }
 
@@ -164,6 +167,7 @@ $WatchProvider.WatchManager.prototype.scheduleDelivery_ = function () {
 
 $WatchProvider.WatchManager.prototype.deliver_ = function () {
   this.processQueues_();
+  this.got_changes_ = false;
 
   this.checkStackSize_();
   if (this.stack_.length !== 0) {
@@ -200,6 +204,10 @@ $WatchProvider.WatchManager.prototype.processQueues_ = function () {
     }
   }
 
+  if (queue_length === 0) {
+    return;
+  }
+
   while (queue_length--) {
     var item = queue.shift();
     if (item) {
@@ -219,6 +227,10 @@ $WatchProvider.WatchManager.prototype.processQueues_ = function () {
         this.$exceptionHandler(err);
       }
     }
+  }
+
+  if (!this.got_changes_) {
+    return;
   }
 
   forEach(this.subscribers_, function (subscriber) {
@@ -271,16 +283,17 @@ $WatchProvider.WatchManager.prototype.flush = function () {
 
 
 $WatchProvider.WatchManager.prototype.flush_ = function () {
-  var delivers_before = this.deliveries_;
+  var deliveries_before = this.deliveries_;
+  var async_callbacks_before = this.async_callbacks_;
 
   this.watchers_.forEach(function (watcher) {
     watcher.flush();
   });
 
   this.async_callback_observer_.deliver();
-
   this.delivery_observer_.deliver();
-  if (this.deliveries_ !== delivers_before) {
+
+  if (this.deliveries_ !== deliveries_before || this.async_callbacks_ !== async_callbacks_before) {
     this.flush_();
   }
 };
@@ -309,6 +322,8 @@ $WatchProvider.WatchManager.prototype.disposeAll = function () {
   clearTimeout(this.stack_reset_timeout_);
   this.stack_reset_timeout_ = 0;
   this.stack_.length = 0;
+
+  this.got_changes_ = true;
 };
 
 
