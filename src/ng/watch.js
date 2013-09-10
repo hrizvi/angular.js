@@ -162,10 +162,19 @@ $WatchProvider.WatchManager.prototype.scheduleDelivery_ = function () {
 };
 
 
-// TODO: Refactor (method too long)
 $WatchProvider.WatchManager.prototype.deliver_ = function () {
+  this.processQueues_();
+
+  this.checkStackSize_();
+  if (this.stack_.length !== 0) {
+    this.scheduleStackReset_();
+  }
+};
+
+
+$WatchProvider.WatchManager.prototype.processQueues_ = function () {
   var async_callback_queue = this.async_callback_queue_.slice();
-  this.async_callback_queue_ = [];
+  this.async_callback_queue_.length = 0;
 
   var queue = this.queue_;
   var watcher_indexes = this.watcher_queue_indexes_;
@@ -220,7 +229,10 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
       this.$exceptionHandler(err);
     }
   }, this);
+};
 
+
+$WatchProvider.WatchManager.prototype.checkStackSize_ = function () {
   // TODO: extract the limit
   if (this.stack_.length >= 100) {
     var last_calls = this.stack_.slice(-5);
@@ -231,7 +243,10 @@ $WatchProvider.WatchManager.prototype.deliver_ = function () {
       'Calls in the last 5 iterations: ' + toJson(last_calls)
     );
   }
+};
 
+
+$WatchProvider.WatchManager.prototype.scheduleStackReset_ = function () {
   var self = this;
   if (!this.stack_reset_timeout_) {
     this.stack_reset_timeout_ = setTimeout(function () {
