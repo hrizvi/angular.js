@@ -166,6 +166,92 @@ describe('$watch', function () {
   }));
 
 
+  describe('$evalAsync', function () {
+    it('should call $evalAsync callback on flush', inject(function ($watch) {
+      var count = 0;
+
+      $watch.evalAsync(function () {
+        count += 1;
+      });
+
+      $watch.flush();
+      expect(count).toBe(1);
+    }));
+
+
+    it('should not call a single $evalAsync callback multiple times', inject(function ($watch) {
+      var count = 0;
+
+      $watch.evalAsync(function () {
+        count += 1;
+      });
+
+      $watch.flush();
+      $watch.flush();
+      expect(count).toBe(1);
+    }));
+
+
+    it('should call $evalAsync callback with the provided arguments', inject(function ($watch) {
+      var count = 0;
+
+      var x = {};
+      var y = 2;
+      var z = null;
+
+      $watch.evalAsync(function (a, b, c) {
+        count += 1;
+        expect(a).toBe(x);
+        expect(b).toBe(y);
+        expect(c).toBe(z);
+      }, x, y, z);
+
+      $watch.flush();
+      expect(count).toBe(1);
+    }));
+
+
+    it('should loop on a recursive $evalAsync call', inject(function ($watch) {
+      var count = 0;
+
+      $watch.evalAsync(function () {
+        count += 1;
+        $watch.evalAsync(function () {
+          count += 1;
+        });
+      });
+
+      $watch.flush();
+      expect(count).toBe(2);
+    }));
+
+
+    it('should trigger path observers', inject(function ($watch) {
+      var count = 0;
+      var watch_value;
+
+      obj.a = 3;
+
+      $watch(obj, 'a', function (value) {
+        count += 1;
+        watch_value = value;
+      });
+
+      $watch.flush();
+      count = 0;
+
+      $watch.evalAsync(function () {
+        count += 1;
+        obj.a = 5;
+      });
+
+      $watch.flush();
+      expect(count).toBe(2);
+      expect(watch_value).toBe(5);
+    }));
+  });
+
+
   describe('exceptions', function () {
     it('should delegate exceptions from watcher listeners', inject(function ($watch, $exceptionHandler, $log) {
       obj.a = 3;

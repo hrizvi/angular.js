@@ -8,6 +8,7 @@ function $WatchProvider() {
 
     var $watch = manager.watch.bind(manager);
     $watch.subscribe = manager.subscribe.bind(manager);
+    $watch.evalAsync = manager.evalAsync.bind(manager);
     $watch.flush = manager.flush.bind(manager);
     $watch.disposeAll = manager.disposeAll.bind(manager);
 
@@ -28,12 +29,18 @@ $WatchProvider.WatchManager = function ($parse, $exceptionHandler) {
 
   this.queue_ = [];
   this.watcher_queue_indexes_ = {};
+  this.async_callback_queue_ = [];
 
   this.stack_reset_timeout_ = 0;
   this.stack_ = [];
 
+  this.async_callbacks_ = 0;
+  this.async_callback_observer_ = new $WatchProvider.PathObserver(
+      this, 'async_callbacks_', this.scheduleDelivery_, this);
+
   this.deliveries_ = 0;
-  this.delivery_observer_ = new $WatchProvider.PathObserver(this, 'deliveries_', this.deliver_, this);
+  this.delivery_observer_ = new $WatchProvider.PathObserver(
+      this, 'deliveries_', this.deliver_, this);
 };
 
 
@@ -67,6 +74,13 @@ $WatchProvider.WatchManager.prototype.subscribe = function (subscriber) {
 };
 
 
+$WatchProvider.WatchManager.prototype.evalAsync = function (callback, var_args) {
+  var args = Array.prototype.slice.call(arguments, 1);
+
+  this.queueAsyncCallback_(callback, args);
+};
+
+
 $WatchProvider.WatchManager.prototype.queueListener_ =
     function (obj, exp, listener, value, last) {
   var queue_item = {
@@ -79,7 +93,7 @@ $WatchProvider.WatchManager.prototype.queueListener_ =
   };
 
   this.queue_.push(queue_item);
-  this.reportDelivery_();
+  this.scheduleDelivery_();
 };
 
 
@@ -100,7 +114,18 @@ $WatchProvider.WatchManager.prototype.queueWatcherListener_ =
   var queue_length = this.queue_.push(queue_item);
   this.watcher_queue_indexes_[watcher.id] = queue_length - 1;
 
-  this.reportDelivery_();
+  this.scheduleDelivery_();
+};
+
+
+$WatchProvider.WatchManager.prototype.queueAsyncCallback_ = function (callback, args) {
+  var queue_item = {
+    callback: callback,
+    args: args
+  };
+
+  this.async_callback_queue_.push(queue_item);
+  this.async_callbacks_ += 1;
 };
 
 
@@ -132,24 +157,39 @@ $WatchProvider.WatchManager.prototype.addWatcher_ =
 };
 
 
-$WatchProvider.WatchManager.prototype.reportDelivery_ = function () {
+$WatchProvider.WatchManager.prototype.scheduleDelivery_ = function () {
   this.deliveries_ += 1;
 };
 
 
 // TODO: Refactor (method too long)
 $WatchProvider.WatchManager.prototype.deliver_ = function () {
+  var async_callback_queue = this.async_callback_queue_.slice();
+  this.async_callback_queue_ = [];
+
   var queue = this.queue_;
   var watcher_indexes = this.watcher_queue_indexes_;
 
+  var async_callback_queue_length = async_callback_queue.length;
   var queue_length = queue.length;
-  if (queue_length === 0) {
+  if (queue_length === 0 && async_callback_queue_length === 0) {
     this.stack_.length = 0;
     return;
   }
 
   var iteration_calls = [];
   this.stack_.push(iteration_calls);
+
+  while (async_callback_queue_length--) {
+    var item = async_callback_queue.shift();
+    var callback = item.callback;
+    try {
+      callback.apply(null, item.args || []);
+      iteration_calls.push('fn: ' + (callback.name || callback.toString()));
+    } catch (err) {
+      this.$exceptionHandler(err);
+    }
+  }
 
   while (queue_length--) {
     var item = queue.shift();
@@ -222,6 +262,8 @@ $WatchProvider.WatchManager.prototype.flush_ = function () {
     watcher.flush();
   });
 
+  this.async_callback_observer_.deliver();
+
   this.delivery_observer_.deliver();
   if (this.deliveries_ !== delivers_before) {
     this.flush_();
@@ -235,12 +277,19 @@ $WatchProvider.WatchManager.prototype.disposeAll = function () {
   });
   this.subscribers_ = [];
 
+  this.async_callback_queue_ = [];
   this.queue_ = [];
   this.watcher_queue_indexes_ = {};
 
+  this.async_callback_observer_.close();
+  this.async_callbacks_ = 0;
+  this.async_callback_observer_ = new $WatchProvider.PathObserver(
+      this, 'async_callbacks_', this.scheduleDelivery_, this);
+
   this.delivery_observer_.close();
   this.deliveries_ = 0;
-  this.delivery_observer_ = new $WatchProvider.PathObserver(this, 'deliveries_', this.deliver_, this);
+  this.delivery_observer_ = new $WatchProvider.PathObserver(
+      this, 'deliveries_', this.deliver_, this);
 
   clearTimeout(this.stack_reset_timeout_);
   this.stack_reset_timeout_ = 0;
