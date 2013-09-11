@@ -144,27 +144,19 @@ $WatchProvider.WatchManager.prototype.queueAsyncCallback_ = function (callback, 
 
 $WatchProvider.WatchManager.prototype.addWatcher_ =
     function (obj, exp, desc, listener, deep_equal) {
-  var watcher = new $WatchProvider.Watcher(obj, exp, desc.paths, deep_equal);
-  var last_value = desc.get(obj);
+  var watcher = new $WatchProvider.Watcher(obj, exp, desc, deep_equal);
 
   var self = this;
-  watcher.onchange = function (changed_path) {
+  watcher.onchange = function (value, last_value, changed_path) {
     // Note: Both Object.observer and Polymer/observe-js check for NaNs.
 
-    var value = desc.get(obj);
     if (!deep_equal || !equals(value, last_value)) {
       self.got_changes_ = true;
       self.queueWatcherListener_(watcher, listener, value, last_value);
     }
-
-    last_value = deep_equal ? copy(value) : value;
   };
 
-  this.queueWatcherListener_(watcher, listener, last_value, last_value);
-
-  if (deep_equal) {
-    last_value = copy(last_value);
-  }
+  this.queueWatcherListener_(watcher, listener, watcher.value, watcher.last_value);
 
   return watcher;
 };
@@ -356,14 +348,18 @@ $WatchProvider.WatchManager.prototype.disposeAll = function () {
  * @constructor
  * @param {!Object} root The object on which to observe paths.
  * @param {string} exp The watched expression.
- * @param {!Array.<string>} paths The paths to observe.
+ * @param {{paths: !Array.<string>, get: (function(!Object): *)}} desc An expression descriptor.
  * @param {boolean=} deep Whether to watch all levels.
  */
-$WatchProvider.Watcher = function (root, exp, paths, deep) {
+$WatchProvider.Watcher = function (root, exp, desc, deep) {
   this.id = (++$WatchProvider.Watcher.prototype.id);
   this.root = root;
   this.exp = exp;
-  this.paths_ = paths;
+
+  this.value = desc.get(root);
+  this.last_value = deep ? copy(this.value) : this.value;
+
+  this.desc_ = desc;
   this.deep_ = !!deep;
 
   /**
@@ -384,7 +380,7 @@ $WatchProvider.Watcher = function (root, exp, paths, deep) {
 
 
 $WatchProvider.Watcher.prototype.init = function () {
-  forEach(this.paths_, function (path) {
+  forEach(this.desc_.paths, function (path) {
     var handleChange = function (new_value) {
       this.handlePathChange_(path);
 
@@ -420,7 +416,12 @@ $WatchProvider.Watcher.prototype.onchange = noop;
 
 
 $WatchProvider.Watcher.prototype.handlePathChange_ = function (changed_path) {
-  this.onchange(changed_path);
+  var last_value = this.last_value;
+
+  this.value = this.desc_.get(this.root);
+  this.last_value = this.deep_ ? copy(this.value) : this.value;
+
+  this.onchange(this.value, last_value, changed_path);
 };
 
 
