@@ -7,6 +7,7 @@ function $WatchProvider() {
     var manager = new $WatchProvider.WatchManager($parse, $exceptionHandler);
 
     var $watch = manager.watch.bind(manager);
+    $watch.watchCollection = manager.watchCollection.bind(manager);
     $watch.subscribe = manager.subscribe.bind(manager);
     $watch.evalAsync = manager.evalAsync.bind(manager);
     $watch.flush = manager.flush.bind(manager);
@@ -73,6 +74,60 @@ $WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep
 
   return function () {
     watcher.dispose();
+  };
+};
+
+
+$WatchProvider.WatchManager.prototype.watchCollection = function (obj, exp, listener) {
+  var collection_observer;
+  var last_collection_snapshot;
+
+  var watcher_set = new $WatchProvider.WatcherSet();
+  this.watchers_.push(watcher_set);
+
+  var registerCollection = function (collection) {
+    var handleChange = function () {
+      var last_collection = last_collection_snapshot;
+      last_collection_snapshot = shallowCopy(collection);
+
+      listener(collection, last_collection_snapshot, obj);
+    };
+
+    if (isArray(collection)) {
+      collection_observer = new $WatchProvider.ArrayObserver(collection, handleChange);
+    } else {
+      collection_observer = new $WatchProvider.ObjectObserver(collection, handleChange);
+    }
+
+    last_collection_snapshot = shallowCopy(collection);
+  };
+
+  var handleCollectionChange = function (collection, old_collection) {
+    if (collection_observer) {
+      collection_observer.close();
+      watcher_set.removeObserver(collection_observer);
+    }
+
+    registerCollection(collection);
+    watcher_set.addObserver(collection_observer);
+
+    listener(collection, old_collection, obj);
+  };
+
+  var path_watcher = this.watch_(obj, exp, handleCollectionChange);
+  if (!path_watcher) {
+    throw new Error('No observable path in expression: ' + exp);
+  }
+  watcher_set.add(path_watcher);
+
+  registerCollection(path_watcher.value);
+
+  return function () {
+    watcher_set.dispose();
+
+    watcher_set = null;
+    path_watcher = null;
+    collection_observer = null;
   };
 };
 
@@ -505,6 +560,54 @@ $WatchProvider.Watcher.prototype.dispose = function () {
 
 
 
+$WatchProvider.WatcherSet = function () {
+  this.watchers_ = [];
+  this.observers_ = [];
+};
+
+
+$WatchProvider.WatcherSet.prototype.add = function (watcher) {
+  this.watchers_.push(watcher);
+};
+
+
+$WatchProvider.WatcherSet.prototype.addObserver = function (observer) {
+  this.observers_.push(observer);
+};
+
+
+
+$WatchProvider.WatcherSet.prototype.remove = function (watcher) {
+  arrayRemove(this.watchers_, watcher);
+};
+
+
+$WatchProvider.WatcherSet.prototype.removeObserver = function (observer) {
+  arrayRemove(this.observers_, observer);
+};
+
+
+$WatchProvider.WatcherSet.prototype.flush = function () {
+  forEach(this.observers_, function (observer) {
+    observer.deliver();
+  });
+  forEach(this.watchers_, function (watcher) {
+    watcher.flush();
+  });
+};
+
+
+$WatchProvider.WatcherSet.prototype.dispose = function () {
+  forEach(this.observers_, function (observer) {
+    observer.close();
+  });
+  forEach(this.watchers_, function (watcher) {
+    watcher.dispose();
+  });
+};
+
+
+
 /**
  * Polymer/observe-js ObjectObserver extension that does not catch exceptions
  * @constructor
@@ -542,5 +645,27 @@ inherits($WatchProvider.PathObserver, PathObserver);
  * @override
  */
 $WatchProvider.PathObserver.prototype.invokeCallback = function (args) {
+  this.callback.apply(this.target, args);
+};
+
+
+
+
+/**
+ * Polymer/observe-js ArrayObserver extension that does not catch exceptions
+ * @constructor
+ * @extends {ArrayObserver}
+ */
+$WatchProvider.ArrayObserver = function () {
+  ArrayObserver.apply(this, Array.prototype.slice.call(arguments));
+};
+
+inherits($WatchProvider.ArrayObserver, ArrayObserver);
+
+
+/**
+ * @override
+ */
+$WatchProvider.ArrayObserver.prototype.invokeCallback = function (args) {
   this.callback.apply(this.target, args);
 };

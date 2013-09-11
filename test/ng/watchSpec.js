@@ -730,6 +730,187 @@ describe('$watch', function () {
   });
 
 
+  describe('collection watching', function () {
+    var obj;
+
+    beforeEach(inject(function ($watch) {
+      log = [];
+      obj = {};
+
+      deregister = $watch.watchCollection(obj, 'collection', function logger(collection) {
+        log.push(toJson(collection));
+      });
+    }));
+
+
+    it('should not trigger if nothing change', inject(function ($watch) {
+      $watch.flush();
+      expect(log).toEqual([undefined]);
+
+      $watch.flush();
+      expect(log).toEqual([undefined]);
+    }));
+
+
+    it('should allow deregistration', inject(function ($watch) {
+      obj.collection = [];
+      $watch.flush();
+
+      expect(log).toEqual(['[]']);
+
+      obj.collection.push('a');
+      deregister();
+
+      $watch.flush();
+      expect(log).toEqual(['[]']);
+    }));
+
+
+    describe('array', function() {
+      it('should trigger when property changes into array', inject(function ($watch) {
+        obj.collection = 'test';
+        $watch.flush();
+        expect(log).toEqual(['"test"']);
+
+        obj.collection = [];
+        $watch.flush();
+        expect(log).toEqual(['"test"', '[]']);
+
+        obj.collection = {};
+        $watch.flush();
+        expect(log).toEqual(['"test"', '[]', '{}']);
+
+        obj.collection = [];
+        $watch.flush();
+        expect(log).toEqual(['"test"', '[]', '{}', '[]']);
+
+        obj.collection = undefined;
+        $watch.flush();
+        expect(log).toEqual(['"test"', '[]', '{}', '[]', undefined]);
+      }));
+
+
+      it('should not trigger change when object in collection changes', inject(function ($watch) {
+        obj.collection = [{}];
+        $watch.flush();
+        expect(log).toEqual(['[{}]']);
+
+        obj.collection[0].name = 'foo';
+        $watch.flush();
+        expect(log).toEqual(['[{}]']);
+      }));
+
+
+      it('should watch array properties', inject(function ($watch) {
+        obj.collection = [];
+        $watch.flush();
+        expect(log).toEqual(['[]']);
+
+        obj.collection.push('a');
+        $watch.flush();
+        expect(log).toEqual(['[]', '["a"]']);
+
+        obj.collection[0] = 'b';
+        $watch.flush();
+        expect(log).toEqual(['[]', '["a"]', '["b"]']);
+
+        obj.collection.push([]);
+        obj.collection.push({});
+        log = [];
+        $watch.flush();
+        expect(log).toEqual(['["b",[],{}]']);
+
+        var temp = obj.collection[1];
+        obj.collection[1] = obj.collection[2];
+        obj.collection[2] = temp;
+        $watch.flush();
+        expect(log).toEqual([ '["b",[],{}]', '["b",{},[]]' ]);
+
+        obj.collection.shift()
+        log = [];
+        $watch.flush();
+        expect(log).toEqual([ '[{},[]]' ]);
+      }));
+
+      it('should watch array-like objects like arrays', inject(function ($watch) {
+        var arrayLikelog = [];
+        var obj = {};
+
+        $watch.watchCollection(obj, 'arrayLikeObject', function logger(obj) {
+          forEach(obj, function (element) {
+            arrayLikelog.push(element.name);
+          })
+        });
+
+        document.body.innerHTML = "<p>" +
+            "<a name='x'>a</a>" +
+            "<a name='y'>b</a>" +
+          "</p>";
+
+        obj.arrayLikeObject = document.getElementsByTagName('a');
+        $watch.flush();
+        expect(arrayLikelog).toEqual(['x', 'y']);
+      }));
+    });
+
+
+    describe('object', function() {
+      it('should trigger when property changes into object', inject(function ($watch) {
+        obj.collection = 'test';
+        $watch.flush();
+        expect(log).toEqual(['"test"']);
+
+        obj.collection = {};
+        $watch.flush();
+        expect(log).toEqual(['"test"', '{}']);
+      }));
+
+
+      it('should not trigger change when object in collection changes', inject(function ($watch) {
+        obj.collection = {name: {}};
+        $watch.flush();
+        expect(log).toEqual(['{"name":{}}']);
+
+        obj.collection.name.bar = 'foo';
+        $watch.flush();
+        expect(log).toEqual(['{"name":{}}']);
+      }));
+
+
+      it('should watch object properties', inject(function ($watch) {
+        obj.collection = {};
+        $watch.flush();
+        expect(log).toEqual(['{}']);
+
+        obj.collection.a= 'A';
+        $watch.flush();
+        expect(log).toEqual(['{}', '{"a":"A"}']);
+
+        obj.collection.a = 'B';
+        $watch.flush();
+        expect(log).toEqual(['{}', '{"a":"A"}', '{"a":"B"}']);
+
+        obj.collection.b = [];
+        obj.collection.c = {};
+        log = [];
+        $watch.flush();
+        expect(log).toEqual(['{"a":"B","b":[],"c":{}}']);
+
+        var temp = obj.collection.a;
+        obj.collection.a = obj.collection.b;
+        obj.collection.c = temp;
+        $watch.flush();
+        expect(log).toEqual([ '{"a":"B","b":[],"c":{}}', '{"a":[],"b":[],"c":"B"}' ]);
+
+        delete obj.collection.a;
+        log = [];
+        $watch.flush();
+        expect(log).toEqual([ '{"b":[],"c":"B"}' ]);
+      }));
+    });
+  });
+
+
   describe('subscribe', function () {
     it('should allow subscribing to all changes to observed paths', inject(function ($watch) {
       var count = 0;
