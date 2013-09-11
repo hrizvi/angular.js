@@ -46,19 +46,30 @@ $WatchProvider.WatchManager = function ($parse, $exceptionHandler) {
 };
 
 
-$WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep_equal) {
+$WatchProvider.WatchManager.prototype.watch_ = function (obj, exp, listener, deep_equal) {
   if (!isString(exp)) {
-    throw new Error('Watch expression can only by strings');
+    throw new Error('Watch expressions can only be strings');
   }
 
   var desc = this.$parse.prepareObservable(exp);
   if (!desc.observable || desc.paths.length === 0) {
     var value = desc.get();
     this.queueListener_(obj, exp, listener, value, value);
-    return noop;
+    return null;
   }
 
   var watcher = this.addWatcher_(obj, exp, desc, listener, deep_equal);
+  return watcher;
+};
+
+
+$WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep_equal) {
+  var watcher = this.watch_(obj, exp, listener, deep_equal);
+  if (!watcher) {
+    return noop;
+  }
+
+  this.watchers_.push(watcher);
 
   return function () {
     watcher.dispose();
@@ -149,7 +160,6 @@ $WatchProvider.WatchManager.prototype.addWatcher_ =
     last_value = deep_equal ? copy(value) : value;
   };
 
-  this.watchers_.push(watcher);
   this.queueWatcherListener_(watcher, listener, last_value, last_value);
 
   if (deep_equal) {
