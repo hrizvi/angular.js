@@ -228,10 +228,24 @@ $WatchProvider.WatchManager.prototype.processQueues_ = function () {
       var listener = item.listener;
       try {
         item.listener.call(null, item.value, item.last_value, item.obj);
+
+        var new_value_log, old_value_log;
+        try {
+          new_value_log = toJson(item.value);
+        } catch (err) {
+          // TypeError: Converting circular structure to JSON
+          new_value_log = '*CIRCULAR*';
+        }
+        try {
+          old_value_log = toJson(item.last_value);
+        } catch (err) {
+          // TypeError: Converting circular structure to JSON
+          old_value_log = '*CIRCULAR*';
+        }
         iteration_calls.push(
           item.exp + '; ' +
-          'newVal: ' + toJson(item.value) + '; ' +
-          'oldVal: ' + toJson(item.last_value)
+          'newVal: ' + new_value_log + '; ' +
+          'oldVal: ' + old_value_log
         );
       } catch (err) {
         this.$exceptionHandler(err);
