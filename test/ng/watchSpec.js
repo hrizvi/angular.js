@@ -750,7 +750,48 @@ describe('$watch', function () {
   });
 
 
-  describe('collection watching', function () {
+  describe('watchPaths', function () {
+    it('should trigger on change to any path', inject(function ($watch) {
+      var count = 0;
+
+      var paths = [ 'a', 'b.c', 'x' ];
+      $watch.watchPaths(obj, paths, function () {
+        count += 1;
+      });
+
+      $watch.flush();
+      count = 0;
+
+      obj.a = 5;
+      $watch.flush();
+      expect(count).toBe(1);
+
+      obj.b = { c: 6 };
+      $watch.flush();
+      expect(count).toBe(2);
+    }));
+
+
+    it('should aggregate changes to multiple paths', inject(function ($watch) {
+      var count = 0;
+
+      var paths = [ 'a', 'b.c', 'x' ];
+      $watch.watchPaths(obj, paths, function () {
+        count += 1;
+      });
+
+      $watch.flush();
+      count = 0;
+
+      obj.a = 5;
+      obj.b = { c: 6 };
+      $watch.flush();
+      expect(count).toBe(1);
+    }));
+  });
+
+
+  describe('watchCollection', function () {
     var obj;
 
     beforeEach(inject(function ($watch) {

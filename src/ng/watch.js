@@ -7,6 +7,7 @@ function $WatchProvider() {
     var manager = new $WatchProvider.WatchManager($parse, $exceptionHandler);
 
     var $watch = manager.watch.bind(manager);
+    $watch.watchPaths = manager.watchPaths.bind(manager);
     $watch.watchCollection = manager.watchCollection.bind(manager);
     $watch.subscribe = manager.subscribe.bind(manager);
     $watch.evalAsync = manager.evalAsync.bind(manager);
@@ -74,6 +75,28 @@ $WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep
 
   return function () {
     watcher.dispose();
+    watcher = null;
+  };
+};
+
+
+$WatchProvider.WatchManager.prototype.watchPaths = function (obj, paths, listener, deep_equal) {
+  var desc = {
+    get: noop,
+    observable: true,
+    paths: paths
+  };
+
+  var handleChange = function () {
+    listener(obj);
+  };
+
+  var watcher = this.addWatcher_(obj, null, desc, handleChange, deep_equal);
+  this.watchers_.push(watcher);
+
+  return function () {
+    watcher.dispose();
+    watcher = null;
   };
 };
 
