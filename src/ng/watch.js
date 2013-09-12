@@ -79,58 +79,39 @@ $WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep
 
 
 $WatchProvider.WatchManager.prototype.watchCollection = function (obj, exp, listener) {
-  var collection_observer;
-  var last_collection_snapshot;
+  var path_watcher;
 
-  var watcher_set = new $WatchProvider.WatcherSet();
-  this.watchers_.push(watcher_set);
-
-  var registerCollection = function (collection) {
-    var handleChange = function () {
-      var last_collection = last_collection_snapshot;
-      last_collection_snapshot = shallowCopy(collection);
-
-      listener(collection, last_collection_snapshot, obj);
-    };
-
-    if (isArray(collection)) {
-      collection_observer = new $WatchProvider.ArrayObserver(collection, handleChange);
-    } else {
-      collection_observer = new $WatchProvider.ObjectObserver(collection, handleChange);
+  var onNewCollection = function (collection, old_collection) {
+    if (path_watcher) {
+      collection_watcher.setCollection(collection);
     }
-
-    last_collection_snapshot = shallowCopy(collection);
-  };
-
-  var handleCollectionChange = function (collection, old_collection) {
-    if (collection_observer) {
-      collection_observer.close();
-      watcher_set.removeObserver(collection_observer);
-    }
-
-    registerCollection(collection);
-    watcher_set.addObserver(collection_observer);
-
     listener(collection, old_collection, obj);
   };
 
-  var path_watcher = this.watch_(obj, exp, handleCollectionChange);
-  if (!path_watcher) {
-    throw new Error('No observable path in expression: ' + exp);
-  }
-  watcher_set.add(path_watcher);
+  path_watcher = this.watch_(obj, exp, onNewCollection, false);
 
-  registerCollection(path_watcher.value);
+  if (path_watcher) {
+    collection_watcher = new $WatchProvider.CollectionWatcher();
+    collection_watcher.setCollection(path_watcher.value);
+
+    collection_watcher.onchange = function (collection, old_collection) {
+      listener(collection, old_collection, obj);
+    };
+
+    this.watchers_.push(path_watcher);
+    this.watchers_.push(collection_watcher);
+  }
 
   return function () {
-    watcher_set.dispose();
+    if (path_watcher) {
+      collection_watcher.dispose();
+      collection_watcher = null;
 
-    watcher_set = null;
-    path_watcher = null;
-    collection_observer = null;
+      path_watcher.dispose();
+      path_watcher = null;
+    }
   };
 };
-
 
 $WatchProvider.WatchManager.prototype.subscribe = function (subscriber) {
   this.subscribers_.push(subscriber);
@@ -560,50 +541,58 @@ $WatchProvider.Watcher.prototype.dispose = function () {
 
 
 
-$WatchProvider.WatcherSet = function () {
-  this.watchers_ = [];
-  this.observers_ = [];
+$WatchProvider.CollectionWatcher = function () {
+  this.id = (++$WatchProvider.Watcher.prototype.id);
+
+  this.collection_ = null;
+  this.old_collection_ = null;
+
+  this.observer_ = null;
 };
 
 
-$WatchProvider.WatcherSet.prototype.add = function (watcher) {
-  this.watchers_.push(watcher);
+$WatchProvider.CollectionWatcher.prototype.onchange = noop;
+
+
+$WatchProvider.CollectionWatcher.prototype.setCollection = function (collection) {
+  if (this.observer_) {
+    this.observer_.close();
+  }
+
+  if (isArray(collection)) {
+    this.observer_ = new $WatchProvider.ArrayObserver(collection, this.handleChange_, this);
+  } else {
+    this.observer_ = new $WatchProvider.ObjectObserver(collection, this.handleChange_, this);
+  }
+
+  this.old_collection_ = shallowCopy(this.collection_);
+  this.collection_ = collection;
 };
 
 
-$WatchProvider.WatcherSet.prototype.addObserver = function (observer) {
-  this.observers_.push(observer);
+$WatchProvider.CollectionWatcher.prototype.handleChange_ = function () {
+  var old_collection = this.old_collection_;
+  this.old_collection_ = shallowCopy(this.collection_);
+
+  this.onchange(this.collection_, old_collection);
 };
 
 
-
-$WatchProvider.WatcherSet.prototype.remove = function (watcher) {
-  arrayRemove(this.watchers_, watcher);
+$WatchProvider.CollectionWatcher.prototype.flush = function () {
+  if (this.observer_) {
+    this.observer_.deliver();
+  }
 };
 
 
-$WatchProvider.WatcherSet.prototype.removeObserver = function (observer) {
-  arrayRemove(this.observers_, observer);
-};
+$WatchProvider.CollectionWatcher.prototype.dispose = function () {
+  if (this.observer_) {
+    this.observer_.close();
+  }
 
-
-$WatchProvider.WatcherSet.prototype.flush = function () {
-  forEach(this.observers_, function (observer) {
-    observer.deliver();
-  });
-  forEach(this.watchers_, function (watcher) {
-    watcher.flush();
-  });
-};
-
-
-$WatchProvider.WatcherSet.prototype.dispose = function () {
-  forEach(this.observers_, function (observer) {
-    observer.close();
-  });
-  forEach(this.watchers_, function (watcher) {
-    watcher.dispose();
-  });
+  this.observer_ = null;
+  this.collection_ = null;
+  this.old_collection_ = null;
 };
 
 

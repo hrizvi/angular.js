@@ -766,6 +766,19 @@ describe('$watch', function () {
     }));
 
 
+    describe('constants', function () {
+      it('should trigger on contant collection', inject(function ($watch) {
+        var value;
+        $watch.watchCollection(obj, '["a","b"]', function (collection) {
+          value = collection;
+        });
+
+        $watch.flush();
+        expect(value).toEqual([ 'a', 'b' ]);
+      }));
+    });
+
+
     describe('array', function() {
       it('should trigger when property changes into array', inject(function ($watch) {
         obj.collection = 'test';
