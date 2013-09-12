@@ -238,6 +238,7 @@ $WatchProvider.WatchManager.prototype.processQueues_ = function () {
       callback.apply(null, item.args || []);
       iteration_calls.push('fn: ' + (callback.name || callback.toString()));
     } catch (err) {
+      this.stack_.length = 0;
       this.$exceptionHandler(err);
     }
   }
@@ -276,6 +277,7 @@ $WatchProvider.WatchManager.prototype.processQueues_ = function () {
           'oldVal: ' + old_value_log
         );
       } catch (err) {
+        this.stack_.length = 0;
         this.$exceptionHandler(err);
       }
     }
@@ -290,6 +292,7 @@ $WatchProvider.WatchManager.prototype.processQueues_ = function () {
       subscriber();
       iteration_calls.push('fn: ' + (subscriber.name || subscriber.toString()));
     } catch (err) {
+      this.stack_.length = 0;
       this.$exceptionHandler(err);
     }
   }, this);

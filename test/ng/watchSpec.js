@@ -349,6 +349,26 @@ describe('$watch', function () {
       expect($exceptionHandler.errors[0].message).toEqual('abc');
       $log.assertEmpty();
     }));
+
+
+    it('should clear stack', function () {
+      module(function ($exceptionHandlerProvider) {
+        $exceptionHandlerProvider.mode('rethrow');
+      });
+      inject(function ($watch, $exceptionHandler, $log) {
+        obj.a = 3;
+
+        $watch(obj, 'a', function () {
+          throw new Error('abc');
+        });
+
+        expect(function () {
+          $watch.flush();
+        }).toThrow('abc');
+
+        $watch.flush();
+      });
+    });
   });
 
 
