@@ -103,6 +103,7 @@ $WatchProvider.WatchManager.prototype.watchPaths = function (obj, paths, listene
 
 $WatchProvider.WatchManager.prototype.watchCollection = function (obj, exp, listener) {
   var path_watcher;
+  var collection_watcher;
 
   var onNewCollection = function (collection, old_collection) {
     if (path_watcher) {
