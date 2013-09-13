@@ -447,7 +447,9 @@ $WatchProvider.Watcher.prototype.init = function () {
       this.handlePathChange_(path);
 
       if (this.deep_) {
-        this.closeObserverTree_(this.child_observers[path]);
+        if (this.child_observers[path]) {
+          this.closeObserverTree_(this.child_observers[path]);
+        }
         if (isObject(new_value)) {
           this.child_observers[path] = this.watchChildren_(new_value, handleChildChange);
         }

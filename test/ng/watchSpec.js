@@ -610,6 +610,24 @@ describe('$watch', function () {
 
 
   describe('deep equality mode', function () {
+    it('should allow non-object initial value', inject(function ($watch) {
+      var count = 0;
+
+      obj.a = 2;
+
+      $watch(obj, 'a', function (value, old_value) {
+        count += 1;
+      }, true);
+
+      $watch.flush();
+      expect(count).toBe(1);
+
+      obj.a = {};
+      $watch.flush();
+      expect(count).toBe(2);
+    }));
+
+
     it('should not consider different objects with the same key/value pairs different', inject(
         function ($watch) {
       var count = 0;
