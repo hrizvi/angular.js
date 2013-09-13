@@ -115,7 +115,7 @@ $WatchProvider.WatchManager.prototype.watchCollection = function (obj, exp, list
   path_watcher = this.watch_(obj, exp, onNewCollection, false);
 
   if (path_watcher) {
-    collection_watcher = new $WatchProvider.CollectionWatcher();
+    collection_watcher = new $WatchProvider.CollectionWatcher(obj, exp);
     collection_watcher.setCollection(path_watcher.value);
 
     collection_watcher.onchange = function (collection, old_collection) {
@@ -570,8 +570,11 @@ $WatchProvider.Watcher.prototype.dispose = function () {
 
 
 
-$WatchProvider.CollectionWatcher = function () {
+$WatchProvider.CollectionWatcher = function (root, exp) {
   this.id = (++$WatchProvider.Watcher.prototype.id);
+
+  this.root = root;
+  this.exp = exp;
 
   this.collection_ = null;
   this.old_collection_ = null;
