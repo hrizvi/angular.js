@@ -858,6 +858,48 @@ describe('$watch', function () {
     });
 
 
+    describe('directly passed collections', function () {
+      it('should trigger on directly passed collection', inject(function ($watch) {
+        var value;
+        var coll = [ 'a', 'b' ];
+
+        $watch.watchCollection(coll, function (collection) {
+          value = collection;
+        });
+
+        $watch.flush();
+        expect(value).toBe(coll);
+      }));
+
+
+      it('should trigger when a directly passed collection changes', inject(function ($watch) {
+        var count = 0;
+        var value;
+        var coll = [ 'a', 'b' ];
+
+        $watch.watchCollection(coll, function (collection) {
+          count += 1;
+          value = collection;
+        });
+
+        $watch.flush();
+        count = 0;
+        value = null;
+
+        coll.push('c');
+        $watch.flush();
+        expect(count).toBe(1);
+        expect(value).toBe(coll);
+        value = null;
+
+        coll[1] = 'd';
+        $watch.flush();
+        expect(count).toBe(2);
+        expect(value).toBe(coll);
+      }));
+    });
+
+
     describe('array', function() {
       it('should trigger when property changes into array', inject(function ($watch) {
         obj.collection = 'test';

@@ -102,35 +102,51 @@ $WatchProvider.WatchManager.prototype.watchPaths = function (obj, paths, listene
 
 
 $WatchProvider.WatchManager.prototype.watchCollection = function (obj, exp, listener) {
+  var watch_path = (arguments.length === 3);
+  if (!watch_path) {
+    listener = arguments[1];
+  }
+
   var path_watcher;
   var collection_watcher;
 
   var onNewCollection = function (collection, old_collection) {
-    if (path_watcher) {
+    if (path_watcher || !watch_path) {
       collection_watcher.setCollection(collection);
     }
     listener(collection, old_collection, obj);
   };
 
-  path_watcher = this.watch_(obj, exp, onNewCollection, false);
+  if (watch_path) {
+    path_watcher = this.watch_(obj, exp, onNewCollection, false);
+    if (path_watcher) {
+      this.watchers_.push(path_watcher);
+    }
+  }
 
   if (path_watcher) {
     collection_watcher = new $WatchProvider.CollectionWatcher(obj, exp);
     collection_watcher.setCollection(path_watcher.value);
+  } else if (!watch_path) {
+    collection_watcher = new $WatchProvider.CollectionWatcher(null, null);
+    collection_watcher.setCollection(obj);
+    this.queueListener_(null, null, listener, obj, obj);
+  }
 
+  if (collection_watcher) {
     collection_watcher.onchange = function (collection, old_collection) {
       listener(collection, old_collection, obj);
     };
-
-    this.watchers_.push(path_watcher);
     this.watchers_.push(collection_watcher);
   }
 
   return function () {
-    if (path_watcher) {
+    if (collection_watcher) {
       collection_watcher.dispose();
       collection_watcher = null;
+    }
 
+    if (path_watcher) {
       path_watcher.dispose();
       path_watcher = null;
     }
