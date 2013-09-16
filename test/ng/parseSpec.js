@@ -357,6 +357,30 @@ describe('parser', function() {
         expect(scope.$eval("'abcd'|substring:1:3|uppercase")).toEqual("BC");
       });
 
+      it('should provide a reference to the original (unfiltered) value when filtering', function () {
+        $filterProvider.register('filterLower', valueFn(function(input) {
+          return input.filter(function(item) {
+            return (item < 5);
+          });
+        }));
+        $filterProvider.register('filterHigher', valueFn(function(input) {
+          return input.filter(function(item) {
+            return (item > 2);
+          });
+        }));
+
+        scope.unfiltered = [ 2, 3, 4, 5, 6 ];
+        var filtered;
+
+        filtered = scope.$eval('unfiltered | filterLower');
+        expect(filtered).toEqual([ 2, 3, 4 ]);
+        expect(filtered.$$unfiltered).toBe(scope.unfiltered);
+
+        filtered = scope.$eval('unfiltered | filterLower | filterHigher');
+        expect(filtered).toEqual([ 3, 4 ]);
+        expect(filtered.$$unfiltered).toBe(scope.unfiltered);
+      });
+
       it('should access scope', function() {
         scope.a =  123;
         scope.b = {c: 456};

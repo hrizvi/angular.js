@@ -325,9 +325,11 @@ Lexer.prototype = {
       ident += '.' + methodName;
     }
 
-    var isInvocation = this.text.charAt(this.index) === '(';
     var isKey = this.text.charAt(this.index) === ':';
-    this.pushIdent(ident, !isInvocation && !isKey && !methodName);
+    if (!isKey) {
+      var isInvocation = this.text.charAt(this.index) === '(';
+      this.pushIdent(ident, !isInvocation && !methodName);
+    }
   },
 
   pushIdent: function(path, observable) {
@@ -596,9 +598,23 @@ Parser.prototype = {
           }
           return fn.apply(self, args);
         };
-        return function() {
-          return fnInvoke;
-        };
+
+        return valueFn(function (self, locals, input) {
+          var unfiltered = isObject(input) ? input.$$unfiltered || input : input;
+          var filtered = fnInvoke(self, locals, input);
+
+          if (isObject(filtered)) {
+            if (Object.defineProperty) {
+              Object.defineProperty(filtered, '$$unfiltered', { value: unfiltered, writable: false });
+            } else if (filtered.__difineGetter__) {
+              filtered.__defineGetter__('$$unfiltered', valueFn(unfiltered));
+            } else {
+              filtered.$$unfiltered = unfiltered;
+            }
+          }
+
+          return filtered;
+        });
       }
     }
   },

@@ -900,6 +900,61 @@ describe('$watch', function () {
     });
 
 
+    describe('filtering', function () {
+      it('should watch filtered collections', inject(function ($watch) {
+        var count = 0;
+        var filtered_collection_watch;
+
+        var unfiltered_collection = [ 2, 3, 4, 5, 6 ];
+        obj.collection = [ 4, 5, 6 ];
+        obj.collection.$$unfiltered = unfiltered_collection;
+
+        $watch.watchCollection(obj, 'collection', function (filtered_collection) {
+          count += 1;
+          filtered_collection_watch = filtered_collection;
+        });
+
+        $watch.flush();
+        expect(count).toBe(1);
+        expect(filtered_collection_watch).toBe(obj.collection);
+
+        unfiltered_collection.push(7);
+        $watch.flush();
+        expect(count).toBe(2);
+        expect(filtered_collection_watch).toBe(obj.collection);
+      }));
+
+
+      it('should watch collections turned into filtered ones', inject(function ($watch) {
+        var count = 0;
+        var filtered_collection_watch;
+
+        var unfiltered_collection = [ 2, 3, 4, 5, 6 ];
+        obj.collection = unfiltered_collection;
+
+        $watch.watchCollection(obj, 'collection', function (filtered_collection) {
+          count += 1;
+          filtered_collection_watch = filtered_collection;
+        });
+
+        $watch.flush();
+        expect(count).toBe(1);
+        expect(filtered_collection_watch).toBe(obj.collection);
+
+        obj.collection = [ 4, 5, 6 ];
+        obj.collection.$$unfiltered = unfiltered_collection;
+        $watch.flush();
+        expect(count).toBe(2);
+        expect(filtered_collection_watch).toBe(obj.collection);
+
+        unfiltered_collection.push(7);
+        $watch.flush();
+        expect(count).toBe(3);
+        expect(filtered_collection_watch).toBe(obj.collection);
+      }));
+    });
+
+
     describe('array', function() {
       it('should trigger when property changes into array', inject(function ($watch) {
         obj.collection = 'test';

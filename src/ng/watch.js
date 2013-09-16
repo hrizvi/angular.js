@@ -101,6 +101,7 @@ $WatchProvider.WatchManager.prototype.watchPaths = function (obj, paths, listene
 };
 
 
+// TODO: Refactor, method too long
 $WatchProvider.WatchManager.prototype.watchCollection = function (obj, exp, listener) {
   var watch_path = (arguments.length === 3);
   if (!watch_path) {
@@ -110,11 +111,27 @@ $WatchProvider.WatchManager.prototype.watchCollection = function (obj, exp, list
   var path_watcher;
   var collection_watcher;
 
+  var is_filtered = false;
+  var old_filtered_collection;
+
   var onNewCollection = function (collection, old_collection) {
-    if (path_watcher || !watch_path) {
-      collection_watcher.setCollection(collection);
+    if (is_filtered) {
+      old_collection = old_filtered_collection;
     }
+
+    if (path_watcher || !watch_path) {
+      var collection_to_observe = collection;
+      if (isObject(collection_to_observe) && collection_to_observe.$$unfiltered) {
+        collection_to_observe = collection_to_observe.$$unfiltered;
+        is_filtered = true;
+      } else {
+        is_filtered = false;
+      }
+      collection_watcher.setCollection(collection_to_observe);
+    }
+
     listener(collection, old_collection, obj);
+    old_filtered_collection = collection;
   };
 
   if (watch_path) {
@@ -125,8 +142,16 @@ $WatchProvider.WatchManager.prototype.watchCollection = function (obj, exp, list
   }
 
   if (path_watcher) {
+    var collection_to_observe = path_watcher.value;
+    if (isObject(collection_to_observe) && collection_to_observe.$$unfiltered) {
+      collection_to_observe = collection_to_observe.$$unfiltered;
+      is_filtered = true;
+    } else {
+      is_filtered = false;
+    }
     collection_watcher = new $WatchProvider.CollectionWatcher(obj, exp);
-    collection_watcher.setCollection(path_watcher.value);
+    collection_watcher.setCollection(collection_to_observe);
+
   } else if (!watch_path) {
     collection_watcher = new $WatchProvider.CollectionWatcher(null, null);
     collection_watcher.setCollection(obj);
@@ -135,7 +160,13 @@ $WatchProvider.WatchManager.prototype.watchCollection = function (obj, exp, list
 
   if (collection_watcher) {
     collection_watcher.onchange = function (collection, old_collection) {
+      if (is_filtered) {
+        collection = path_watcher.getCurrentValue();
+        old_collection = old_filtered_collection;
+      }
+
       listener(collection, old_collection, obj);
+      old_filtered_collection = collection;
     };
     this.watchers_.push(collection_watcher);
   }
@@ -499,10 +530,15 @@ $WatchProvider.Watcher.prototype.onchange = noop;
 $WatchProvider.Watcher.prototype.handlePathChange_ = function (changed_path) {
   var last_value = this.last_value;
 
-  this.value = this.desc_.get(this.root);
+  this.value = this.getCurrentValue();
   this.last_value = this.deep_ ? copy(this.value) : this.value;
 
   this.onchange(this.value, last_value, changed_path);
+};
+
+
+$WatchProvider.Watcher.prototype.getCurrentValue = function () {
+  return this.desc_.get(this.root);
 };
 
 
