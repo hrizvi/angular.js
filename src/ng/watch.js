@@ -81,8 +81,9 @@ $WatchProvider.WatchManager.prototype.watch = function (obj, exp, listener, deep
 
 
 $WatchProvider.WatchManager.prototype.watchPaths = function (obj, paths, listener, deep_equal) {
+  var counter = 0;
   var desc = {
-    get: noop,
+    get: function () { return counter++; },
     observable: true,
     paths: paths
   };

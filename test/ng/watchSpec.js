@@ -628,6 +628,24 @@ describe('$watch', function () {
     }));
 
 
+    it('should work with watchPaths', inject(function ($watch) {
+      var count = 0;
+
+      obj.a = 2;
+
+      $watch.watchPaths(obj, ['a'], function () {
+        count += 1;
+      }, true);
+
+      $watch.flush();
+      expect(count).toBe(1);
+
+      obj.a = {};
+      $watch.flush();
+      expect(count).toBe(2);
+    }));
+
+
     it('should not consider different objects with the same key/value pairs different', inject(
         function ($watch) {
       var count = 0;
