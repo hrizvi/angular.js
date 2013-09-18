@@ -11,6 +11,7 @@ function $WatchProvider() {
     $watch.watchCollection = manager.watchCollection.bind(manager);
     $watch.subscribe = manager.subscribe.bind(manager);
     $watch.evalAsync = manager.evalAsync.bind(manager);
+    $watch.evalPostDelivery = manager.evalPostDelivery.bind(manager);
     $watch.flush = manager.flush.bind(manager);
     $watch.disposeAll = manager.disposeAll.bind(manager);
 
@@ -32,6 +33,7 @@ $WatchProvider.WatchManager = function ($parse, $exceptionHandler) {
   this.queue_ = [];
   this.watcher_queue_indexes_ = {};
   this.async_callback_queue_ = [];
+  this.post_delivery_callback_queue_ = [];
 
   this.stack_reset_timeout_ = 0;
   this.stack_ = [];
@@ -202,6 +204,13 @@ $WatchProvider.WatchManager.prototype.evalAsync = function (callback, var_args) 
 };
 
 
+$WatchProvider.WatchManager.prototype.evalPostDelivery = function (callback, var_args) {
+  var args = Array.prototype.slice.call(arguments, 1);
+
+  this.queuePostDeliveryCallback_(callback, args);
+};
+
+
 $WatchProvider.WatchManager.prototype.queueListener_ =
     function (obj, exp, listener, value, last) {
   var queue_item = {
@@ -247,6 +256,16 @@ $WatchProvider.WatchManager.prototype.queueAsyncCallback_ = function (callback, 
 
   this.async_callback_queue_.push(queue_item);
   this.async_callbacks_ += 1;
+};
+
+
+$WatchProvider.WatchManager.prototype.queuePostDeliveryCallback_ = function (callback, args) {
+  var queue_item = {
+    callback: callback,
+    args: args
+  };
+
+  this.post_delivery_callback_queue_.push(queue_item);
 };
 
 
@@ -371,6 +390,23 @@ $WatchProvider.WatchManager.prototype.processQueues_ = function () {
 };
 
 
+$WatchProvider.WatchManager.prototype.processPostDeliveryQueue_ = function () {
+  var post_delivery_callback_queue = this.post_delivery_callback_queue_.slice();
+  this.post_delivery_callback_queue_.length = 0;
+
+  var post_delivery_callback_queue_length = post_delivery_callback_queue.length;
+  while (post_delivery_callback_queue_length--) {
+    var item = post_delivery_callback_queue.shift();
+    var callback = item.callback;
+    try {
+      callback.apply(null, item.args || []);
+    } catch (err) {
+      this.$exceptionHandler(err);
+    }
+  }
+};
+
+
 $WatchProvider.WatchManager.prototype.checkStackSize_ = function () {
   // TODO: extract the limit
   if (this.stack_.length >= 100) {
@@ -389,6 +425,8 @@ $WatchProvider.WatchManager.prototype.scheduleStackReset_ = function () {
   var self = this;
   if (!this.stack_reset_timeout_) {
     this.stack_reset_timeout_ = setTimeout(function () {
+      self.processPostDeliveryQueue_();
+
       self.stack_reset_timeout_ = 0;
       self.stack_.length = 0;
     }, 0);
@@ -402,6 +440,7 @@ $WatchProvider.WatchManager.prototype.flush = function () {
   }
 
   this.flush_();
+  this.processPostDeliveryQueue_();
 
   clearTimeout(this.stack_reset_timeout_);
   this.stack_reset_timeout_ = 0;

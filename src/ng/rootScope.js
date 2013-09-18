@@ -718,7 +718,8 @@ function $RootScopeProvider(){
       },
 
       $$postDigest : function(expr) {
-        this.$$postDigestQueue.push(expr);
+        var callback = $parse(expr);
+        $watch.evalPostDelivery(callback, this);
       },
 
       /**

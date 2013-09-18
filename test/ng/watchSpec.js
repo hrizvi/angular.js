@@ -320,6 +320,153 @@ describe('$watch', function () {
   });
 
 
+  describe('$evalPostDelivery', function () {
+    it('should call $evalPostDelivery callback on flush', inject(function ($watch) {
+      var count = 0;
+
+      $watch.evalPostDelivery(function () {
+        count += 1;
+      });
+
+      $watch.flush();
+      expect(count).toBe(1);
+    }));
+
+
+    it('should not call a single $evalPostDelivery callback multiple times', inject(function ($watch) {
+      var count = 0;
+
+      $watch.evalPostDelivery(function () {
+        count += 1;
+      });
+
+      $watch.flush();
+      $watch.flush();
+      expect(count).toBe(1);
+    }));
+
+
+    it('should call $evalPostDelivery callback with the provided arguments', inject(function ($watch) {
+      var count = 0;
+
+      var x = {};
+      var y = 2;
+      var z = null;
+
+      $watch.evalPostDelivery(function (a, b, c) {
+        count += 1;
+        expect(a).toBe(x);
+        expect(b).toBe(y);
+        expect(c).toBe(z);
+      }, x, y, z);
+
+      $watch.flush();
+      expect(count).toBe(1);
+    }));
+
+
+    it('should call recursively registered $evalPostDelivery callbacks in different iterations',
+        inject(function ($watch) {
+      var count = 0;
+
+      $watch.evalPostDelivery(function () {
+        count += 1;
+        $watch.evalPostDelivery(function () {
+          count += 1;
+        });
+      });
+
+      $watch.flush();
+      expect(count).toBe(1);
+      $watch.flush();
+      expect(count).toBe(2);
+    }));
+
+
+    it('should call $evalPostDelivery callbacks registered from listeners in the same iteration',
+        inject(function ($watch) {
+      var count = 0;
+
+      obj.a = 3;
+
+      $watch(obj, 'a', function (value, old_value) {
+        count += 1;
+        $watch.evalPostDelivery(function () {
+          count += 1;
+        });
+      });
+
+      $watch.flush();
+      expect(count).toBe(2);
+    }));
+
+
+    it('should call $evalPostDelivery callbacks registered from subscribers in the same iteration',
+        inject(function ($watch) {
+      var count = 0;
+
+      obj.a = 3;
+
+      $watch(obj, 'a', noop);
+      $watch.subscribe(function () {
+        count += 1;
+        $watch.evalPostDelivery(function () {
+          count += 1;
+        });
+      });
+
+      $watch.flush();
+      count = 0;
+
+      obj.a = 5;
+      $watch.flush();
+      expect(count).toBe(2);
+    }));
+
+
+    it('should NOT trigger path observers in the same iteration', inject(function ($watch) {
+      var count = 0;
+      var watch_value;
+
+      obj.a = 3;
+
+      $watch(obj, 'a', function (value) {
+        count += 1;
+        watch_value = value;
+      });
+
+      $watch.flush();
+      count = 0;
+
+      $watch.evalPostDelivery(function () {
+        count += 1;
+        obj.a = 5;
+      });
+
+      $watch.flush();
+      expect(count).toBe(1);
+      $watch.flush();
+      expect(count).toBe(2);
+      expect(watch_value).toBe(5);
+    }));
+
+
+    it('should not trigger subscriber calls if no observed value changes', inject(
+        function ($watch) {
+      var log = '';
+
+      obj.a = 3;
+
+      $watch(obj, 'a', noop);
+      $watch.subscribe(function () { log += 'b'; });
+      $watch.evalPostDelivery(function () { log += 'a'; });
+
+      $watch.flush();
+      expect(log).toBe('a');
+    }));
+  });
+
+
   describe('exceptions', function () {
     it('should delegate exceptions from watcher listeners', inject(function ($watch, $exceptionHandler, $log) {
       obj.a = 3;
