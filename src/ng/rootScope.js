@@ -69,8 +69,8 @@ function $RootScopeProvider(){
     return TTL;
   };
 
-  this.$get = ['$injector', '$exceptionHandler', '$parse', '$browser',
-      function( $injector,   $exceptionHandler,   $parse,   $browser) {
+  this.$get = ['$injector', '$exceptionHandler', '$watch', '$parse', '$browser',
+      function( $injector,   $exceptionHandler,   $watch,  $parse,   $browser) {
 
     /**
      * @ngdoc function
@@ -115,7 +115,6 @@ function $RootScopeProvider(){
       this.$id = nextUid();
       this.$parent = null;
 
-      this.$$phase = null;
       this.$$watchers = null;
       this.$$nextSibling = null;
       this.$$prevSibling = null;
@@ -129,6 +128,7 @@ function $RootScopeProvider(){
       this.$$postDigestQueue = [];
       this.$$listeners = {};
       this.$$isolateBindings = {};
+      this.$$watcherDisposeFunctions = [];
     }
 
     /**
@@ -189,6 +189,7 @@ function $RootScopeProvider(){
         child.$$listeners = {};
         child.$parent = this;
         child.$$watchers = null;
+        child.$$watcherDisposeFunctions = [];
         child.$$nextSibling = null;
         child.$$childHead = null;
         child.$$childTail = null;
@@ -276,42 +277,29 @@ function $RootScopeProvider(){
        * @param {boolean=} objectEquality Compare object for equality rather than for reference.
        * @returns {function()} Returns a deregistration function for this listener.
        */
-      $watch: function(watchExp, listener, objectEquality) {
-        var scope = this,
-            get = compileToFn(watchExp, 'watch'),
-            array = scope.$$watchers,
-            watcher = {
-              fn: listener,
-              last: initWatchVal,
-              get: get,
-              exp: watchExp,
-              eq: !!objectEquality
-            };
+      $watch: function(watch_exp, listener, deep_equal) {
+        var dispose;
 
-        // in the case user pass string, we need to compile it, do we really need this ?
-        if (!isFunction(listener)) {
-          var listenFn = compileToFn(listener || noop, 'listener');
-          watcher.fn = function(newVal, oldVal, scope) {listenFn(scope);};
+        if (isString(watch_exp)) {
+          dispose = $watch(this, watch_exp, listener, deep_equal);
+          this.$$watcherDisposeFunctions.push(dispose);
         }
 
-        if (typeof watchExp == 'string' && get.constant) {
-          var originalFn = watcher.fn;
-          watcher.fn = function(newVal, oldVal, scope) {
-            originalFn.call(this, newVal, oldVal, scope);
-            arrayRemove(array, watcher);
+        if (isFunction(watch_exp) && arguments.length === 1) {
+          dispose = $watch.subscribe(watch_exp);
+          this.$$watcherDisposeFunctions.push(dispose);
+        }
+
+        if (dispose) {
+          var self = this;
+          return function () {
+            dispose();
+            arrayRemove(self.$$watcherDisposeFunctions, dispose);
           };
         }
 
-        if (!array) {
-          array = scope.$$watchers = [];
-        }
-        // we use unshift since we use a while loop in $digest for speed.
-        // the while loop reads in reverse order.
-        array.unshift(watcher);
-
-        return function() {
-          arrayRemove(array, watcher);
-        };
+        throw new Error('Invalid scope.$watch(' +
+            '[watch_exp:string], listener:function, [deep_equal:boolean]) usage');
       },
 
 
@@ -366,93 +354,22 @@ function $RootScopeProvider(){
        *    `oldCollection` object is a copy of the former collection data.
        *    The `scope` refers to the current scope.
        *
-       * @returns {function()} Returns a de-registration function for this listener. When the de-registration function 
+       * @returns {function()} Returns a de-registration function for this listener. When the de-registration function
        * is executed, the internal watch operation is terminated.
        */
-      $watchCollection: function(obj, listener) {
-        var self = this;
-        var oldValue;
-        var newValue;
-        var changeDetected = 0;
-        var objGetter = $parse(obj);
-        var internalArray = [];
-        var internalObject = {};
-        var oldLength = 0;
-
-        function $watchCollectionWatch() {
-          newValue = objGetter(self);
-          var newLength, key;
-
-          if (!isObject(newValue)) {
-            if (oldValue !== newValue) {
-              oldValue = newValue;
-              changeDetected++;
-            }
-          } else if (isArrayLike(newValue)) {
-            if (oldValue !== internalArray) {
-              // we are transitioning from something which was not an array into array.
-              oldValue = internalArray;
-              oldLength = oldValue.length = 0;
-              changeDetected++;
-            }
-
-            newLength = newValue.length;
-
-            if (oldLength !== newLength) {
-              // if lengths do not match we need to trigger change notification
-              changeDetected++;
-              oldValue.length = oldLength = newLength;
-            }
-            // copy the items to oldValue and look for changes.
-            for (var i = 0; i < newLength; i++) {
-              if (oldValue[i] !== newValue[i]) {
-                changeDetected++;
-                oldValue[i] = newValue[i];
-              }
-            }
-          } else {
-            if (oldValue !== internalObject) {
-              // we are transitioning from something which was not an object into object.
-              oldValue = internalObject = {};
-              oldLength = 0;
-              changeDetected++;
-            }
-            // copy the items to oldValue and look for changes.
-            newLength = 0;
-            for (key in newValue) {
-              if (newValue.hasOwnProperty(key)) {
-                newLength++;
-                if (oldValue.hasOwnProperty(key)) {
-                  if (oldValue[key] !== newValue[key]) {
-                    changeDetected++;
-                    oldValue[key] = newValue[key];
-                  }
-                } else {
-                  oldLength++;
-                  oldValue[key] = newValue[key];
-                  changeDetected++;
-                }
-              }
-            }
-            if (oldLength > newLength) {
-              // we used to have more keys, need to find them and destroy them.
-              changeDetected++;
-              for(key in oldValue) {
-                if (oldValue.hasOwnProperty(key) && !newValue.hasOwnProperty(key)) {
-                  oldLength--;
-                  delete oldValue[key];
-                }
-              }
-            }
-          }
-          return changeDetected;
+      $watchCollection: function(watchExp, listener) {
+        var dispose;
+        if (isString(watchExp)) {
+          dispose = $watch.watchCollection(this, watchExp, listener);
+        } else {
+          dispose = $watch.watchCollection(watchExp, listener);
         }
 
-        function $watchCollectionAction() {
-          listener(newValue, oldValue, self);
+        if (dispose) {
+          this.$$watcherDisposeFunctions.push(dispose);
         }
 
-        return this.$watch($watchCollectionWatch, $watchCollectionAction);
+        return dispose;
       },
 
       /**
@@ -503,90 +420,7 @@ function $RootScopeProvider(){
        *
        */
       $digest: function() {
-        var watch, value, last,
-            watchers,
-            asyncQueue = this.$$asyncQueue,
-            postDigestQueue = this.$$postDigestQueue,
-            length,
-            dirty, ttl = TTL,
-            next, current, target = this,
-            watchLog = [],
-            logIdx, logMsg;
-
-        beginPhase('$digest');
-
-        do { // "while dirty" loop
-          dirty = false;
-          current = target;
-
-          while(asyncQueue.length) {
-            try {
-              current.$eval(asyncQueue.shift());
-            } catch (e) {
-              $exceptionHandler(e);
-            }
-          }
-
-          do { // "traverse the scopes" loop
-            if ((watchers = current.$$watchers)) {
-              // process our watches
-              length = watchers.length;
-              while (length--) {
-                try {
-                  watch = watchers[length];
-                  // Most common watches are on primitives, in which case we can short
-                  // circuit it with === operator, only when === fails do we use .equals
-                  if (watch && (value = watch.get(current)) !== (last = watch.last) &&
-                      !(watch.eq
-                          ? equals(value, last)
-                          : (typeof value == 'number' && typeof last == 'number'
-                             && isNaN(value) && isNaN(last)))) {
-                    dirty = true;
-                    watch.last = watch.eq ? copy(value) : value;
-                    watch.fn(value, ((last === initWatchVal) ? value : last), current);
-                    if (ttl < 5) {
-                      logIdx = 4 - ttl;
-                      if (!watchLog[logIdx]) watchLog[logIdx] = [];
-                      logMsg = (isFunction(watch.exp))
-                          ? 'fn: ' + (watch.exp.name || watch.exp.toString())
-                          : watch.exp;
-                      logMsg += '; newVal: ' + toJson(value) + '; oldVal: ' + toJson(last);
-                      watchLog[logIdx].push(logMsg);
-                    }
-                  }
-                } catch (e) {
-                  $exceptionHandler(e);
-                }
-              }
-            }
-
-            // Insanity Warning: scope depth-first traversal
-            // yes, this code is a bit crazy, but it works and we have tests to prove it!
-            // this piece should be kept in sync with the traversal in $broadcast
-            if (!(next = (current.$$childHead || (current !== target && current.$$nextSibling)))) {
-              while(current !== target && !(next = current.$$nextSibling)) {
-                current = current.$parent;
-              }
-            }
-          } while ((current = next));
-
-          if(dirty && !(ttl--)) {
-            clearPhase();
-            throw $rootScopeMinErr('infdig',
-                '{0} $digest() iterations reached. Aborting!\nWatchers fired in the last 5 iterations: {1}',
-                TTL, toJson(watchLog));
-          }
-        } while (dirty || asyncQueue.length);
-
-        clearPhase();
-
-        while(postDigestQueue.length) {
-          try {
-            postDigestQueue.shift()();
-          } catch (e) {
-            $exceptionHandler(e);
-          }
-        }
+        $watch.flush();
       },
 
 
@@ -633,6 +467,10 @@ function $RootScopeProvider(){
 
         this.$broadcast('$destroy');
         this.$$destroyed = true;
+
+        forEach(this.$$watcherDisposeFunctions, function (dispose) {
+          dispose();
+        });
 
         if (parent.$$childHead == this) parent.$$childHead = this.$$nextSibling;
         if (parent.$$childTail == this) parent.$$childTail = this.$$prevSibling;
@@ -704,17 +542,8 @@ function $RootScopeProvider(){
        *
        */
       $evalAsync: function(expr) {
-        // if we are outside of an $digest loop and this is the first time we are scheduling async task also schedule
-        // async auto-flush
-        if (!$rootScope.$$phase && !$rootScope.$$asyncQueue.length) {
-          $browser.defer(function() {
-            if ($rootScope.$$asyncQueue.length) {
-              $rootScope.$digest();
-            }
-          });
-        }
-
-        this.$$asyncQueue.push(expr);
+        var callback = $parse(expr);
+        $watch.evalAsync(callback, this);
       },
 
       $$postDigest : function(expr) {
@@ -770,14 +599,12 @@ function $RootScopeProvider(){
        */
       $apply: function(expr) {
         try {
-          beginPhase('$apply');
           return this.$eval(expr);
         } catch (e) {
           $exceptionHandler(e);
         } finally {
-          clearPhase();
           try {
-            $rootScope.$digest();
+            this.$digest();
           } catch (e) {
             $exceptionHandler(e);
             throw e;
@@ -966,28 +793,10 @@ function $RootScopeProvider(){
     return $rootScope;
 
 
-    function beginPhase(phase) {
-      if ($rootScope.$$phase) {
-        throw $rootScopeMinErr('inprog', '{0} already in progress', $rootScope.$$phase);
-      }
-
-      $rootScope.$$phase = phase;
-    }
-
-    function clearPhase() {
-      $rootScope.$$phase = null;
-    }
-
     function compileToFn(exp, name) {
       var fn = $parse(exp);
       assertArgFn(fn, name);
       return fn;
     }
-
-    /**
-     * function used as an initial value for watchers.
-     * because it's unique we can easily tell it apart from other values
-     */
-    function initWatchVal() {}
   }];
 }

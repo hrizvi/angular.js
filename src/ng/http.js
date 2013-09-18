@@ -951,7 +951,6 @@ function $HttpProvider() {
        * Callback registered to $httpBackend():
        *  - caches the response if desired
        *  - resolves the raw $http promise
-       *  - calls $apply
        */
       function done(status, response, headersString) {
         if (cache) {
@@ -964,7 +963,6 @@ function $HttpProvider() {
         }
 
         resolvePromise(response, status, headersString);
-        if (!$rootScope.$$phase) $rootScope.$apply();
       }
 
 

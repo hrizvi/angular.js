@@ -669,14 +669,19 @@ function $SceProvider() {
      *      `context`.
      */
     sce.parseAs = function sceParseAs(type, expr) {
-      var parsed = $parse(expr);
+      var desc = $parse.prepareObservable(expr);
+      var parsed = desc.get;
+
       if (parsed.literal && parsed.constant) {
+        parsed.paths = desc.paths;
         return parsed;
-      } else {
-        return function sceParseAsTrusted(self, locals) {
-          return sce.getTrusted(type, parsed(self, locals));
-        }
       }
+
+      var sceParseAsTrusted = function (self, locals) {
+        return sce.getTrusted(type, parsed(self, locals));
+      };
+      sceParseAsTrusted.paths = desc.paths;
+      return sceParseAsTrusted;
     };
 
     /**

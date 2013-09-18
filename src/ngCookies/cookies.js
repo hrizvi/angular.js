@@ -45,7 +45,7 @@ angular.module('ngCookies', ['ng']).
      </doc:source>
    </doc:example>
    */
-   factory('$cookies', ['$rootScope', '$browser', function ($rootScope, $browser) {
+   factory('$cookies', ['$watch', '$browser', function ($watch, $browser) {
       var cookies = {},
           lastCookies = {},
           lastBrowserCookies,
@@ -60,7 +60,6 @@ angular.module('ngCookies', ['ng']).
           lastBrowserCookies = currentCookies;
           copy(currentCookies, lastCookies);
           copy(currentCookies, cookies);
-          if (runEval) $rootScope.$apply();
         }
       })();
 
@@ -69,7 +68,8 @@ angular.module('ngCookies', ['ng']).
       //at the end of each eval, push cookies
       //TODO: this should happen before the "delayed" watches fire, because if some cookies are not
       //      strings or browser refuses to store some cookies, we update the model in the push fn.
-      $rootScope.$watch(push);
+
+      $watch.watchCollection(cookies, push);
 
       return cookies;
 

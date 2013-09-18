@@ -132,13 +132,15 @@ function $InterpolateProvider() {
           hasInterpolation = false,
           fn,
           exp,
+          paths = [],
           concat = [];
 
       while(index < length) {
         if ( ((startIndex = text.indexOf(startSymbol, index)) != -1) &&
              ((endIndex = text.indexOf(endSymbol, startIndex + startSymbolLength)) != -1) ) {
           (index != startIndex) && parts.push(text.substring(index, startIndex));
-          parts.push(fn = $parse(exp = text.substring(startIndex + startSymbolLength, endIndex)));
+          parts.push(fn = $parse.prepareObservable(exp = text.substring(startIndex + startSymbolLength, endIndex)));
+          paths = paths.concat(fn.paths);
           fn.exp = exp;
           index = endIndex + endSymbolLength;
           hasInterpolation = true;
@@ -173,8 +175,8 @@ function $InterpolateProvider() {
         fn = function(context) {
           try {
             for(var i = 0, ii = length, part; i<ii; i++) {
-              if (typeof (part = parts[i]) == 'function') {
-                part = part(context);
+              if (typeof (part = parts[i]).get == 'function') {
+                part = part.get(context);
                 if (trustedContext) {
                   part = $sce.getTrusted(trustedContext, part);
                 } else {
@@ -196,6 +198,7 @@ function $InterpolateProvider() {
           }
         };
         fn.exp = text;
+        fn.paths = paths;
         fn.parts = parts;
         return fn;
       }

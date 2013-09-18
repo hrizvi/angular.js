@@ -149,8 +149,8 @@
  * @description
  * Emitted every time the ngInclude content is reloaded.
  */
-var ngIncludeDirective = ['$http', '$templateCache', '$anchorScroll', '$compile', '$animate', '$sce',
-                  function($http,   $templateCache,   $anchorScroll,   $compile,   $animate,   $sce) {
+var ngIncludeDirective = ['$http', '$templateCache', '$anchorScroll', '$compile', '$parse', '$watch', '$animate', '$sce',
+                  function($http,   $templateCache,   $anchorScroll,   $compile,   $parse,   $watch,   $animate,   $sce) {
   return {
     restrict: 'ECA',
     priority: 1000,
@@ -177,7 +177,18 @@ var ngIncludeDirective = ['$http', '$templateCache', '$anchorScroll', '$compile'
           }
         };
 
-        scope.$watch($sce.parseAsResourceUrl(srcExp), function ngIncludeWatchAction(src) {
+        var readSrc = $sce.parseAsResourceUrl(srcExp);
+
+        var lastSrc;
+        $watch.watchPaths(scope, readSrc.paths, function () {
+          var src = readSrc(scope);
+          if (src !== lastSrc) {
+            lastSrc = src;
+            ngIncludeWatchAction(src);
+          }
+        });
+
+        function ngIncludeWatchAction(src) {
           var thisChangeId = ++changeCounter;
 
           if (src) {
@@ -209,7 +220,7 @@ var ngIncludeDirective = ['$http', '$templateCache', '$anchorScroll', '$compile'
           } else {
             cleanupLastIncludeContent();
           }
-        });
+        }
       };
     }
   };

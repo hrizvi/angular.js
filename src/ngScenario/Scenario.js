@@ -319,7 +319,7 @@ _jQuery.fn.bindings = function(windowJquery, bindExp) {
           }
           for (var scope, fn, i = 0, ii = fns.length; i < ii; i++) {
             if(match((fn = fns[i]).exp)) {
-              push(fn(scope = scope || element.scope()));
+              push(fn.get(scope = scope || element.scope()));
             }
           }
         }

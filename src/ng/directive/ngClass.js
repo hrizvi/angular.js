@@ -2,13 +2,14 @@
 
 function classDirective(name, selector) {
   name = 'ngClass' + name;
-  return function() {
+  return ['$parse', '$watch', function($parse, $watch) {
     return {
       restrict: 'AC',
       link: function(scope, element, attr) {
         var oldVal = undefined;
 
-        scope.$watch(attr[name], ngClassWatchAction, true);
+        var desc = $parse.prepareObservable(attr[name]);
+        $watch.watchPaths(scope, desc.paths, ngClassWatchAction, true);
 
         attr.$observe('class', function(value) {
           ngClassWatchAction(scope.$eval(attr[name]));
@@ -29,7 +30,8 @@ function classDirective(name, selector) {
         }
 
 
-        function ngClassWatchAction(newVal) {
+        function ngClassWatchAction() {
+          var newVal = desc.get(scope);
           if (selector === true || scope.$index % 2 === selector) {
             if (oldVal && !equals(newVal,oldVal)) {
               removeClass(oldVal);
@@ -66,7 +68,7 @@ function classDirective(name, selector) {
         };
       }
     };
-  };
+  }];
 }
 
 /**

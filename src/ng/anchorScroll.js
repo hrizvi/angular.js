@@ -49,7 +49,7 @@ function $AnchorScrollProvider() {
     autoScrollingEnabled = false;
   };
 
-  this.$get = ['$window', '$location', '$rootScope', function($window, $location, $rootScope) {
+  this.$get = ['$window', '$location', '$watch', function($window, $location, $watch) {
     var document = $window.document;
 
     // helper function to get first anchor from a NodeList
@@ -83,10 +83,9 @@ function $AnchorScrollProvider() {
     // does not scroll when user clicks on anchor link that is currently on
     // (no url change, no $location.hash() change), browser native does scroll
     if (autoScrollingEnabled) {
-      $rootScope.$watch(function autoScrollWatch() {return $location.hash();},
-        function autoScrollWatchAction() {
-          $rootScope.$evalAsync(scroll);
-        });
+      $watch($location, '$$hash', function autoScrollWatchAction() {
+        $watch.evalAsync(scroll);
+      });
     }
 
     return scroll;

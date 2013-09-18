@@ -191,14 +191,13 @@ describe('ngRepeat', function() {
       scope.$digest();
 
       expect(element.text()).toBe('igor;misko;');
-
-      var li0 = element.find('li')[0];
-      var li1 = element.find('li')[1];
+      var li0 = element.find('li').eq(0).text();
+      var li1 = element.find('li').eq(1).text();
 
       scope.items.push(scope.items.shift());
       scope.$digest();
-      expect(element.find('li')[0]).toBe(li1);
-      expect(element.find('li')[1]).toBe(li0);
+      expect(element.find('li').eq(0).text()).toBe(li1);
+      expect(element.find('li').eq(1).text()).toBe(li0);
     });
 
 
@@ -671,7 +670,7 @@ describe('ngRepeat', function() {
       $rootScope.items = [];
       $rootScope.$apply();
       expect(angular.mock.dump(element)).toBe('<!-- ngRepeat: i in items -->');
-      expect(logs).toEqual([1, 2, 1, 2]);
+      expect(logs).toEqual([1, 2]);
     }));
 
 
@@ -698,7 +697,7 @@ describe('ngRepeat', function() {
       $rootScope.items = [];
       $rootScope.$apply();
       expect(sortedHtml(element)).toBe('<span>-</span><!-- ngRepeat: i in items --><span>-</span>');
-      expect(logs).toEqual([1, 2, 1, 2]);
+      expect(logs).toEqual([1, 2]);
     }));
 
 

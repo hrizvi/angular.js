@@ -923,12 +923,10 @@ describe('$route', function() {
         $routeProvider.when('/bar/:barId', {controller: noop, reloadOnSearch: false});
       });
 
-      inject(function($route, $location, $rootScope, $routeParams) {
-        $rootScope.$watch(function() {
-          return $routeParams;
-        }, function(value) {
+      inject(function($route, $location, $watch, $rootScope, $routeParams) {
+        $watch.watchCollection($routeParams, function(value) {
           routeParamsWatcher(value);
-        }, true);
+        });
 
         expect(routeParamsWatcher).not.toHaveBeenCalled();
 

@@ -168,7 +168,8 @@
       </doc:scenario>
     </doc:example>
  */
-var ngPluralizeDirective = ['$locale', '$interpolate', function($locale, $interpolate) {
+var ngPluralizeDirective = ['$locale', '$interpolate', '$parse', '$watch',
+                    function($locale,   $interpolate,   $parse,   $watch) {
   var BRACE = /{}/g;
   return {
     restrict: 'EA',
@@ -194,19 +195,25 @@ var ngPluralizeDirective = ['$locale', '$interpolate', function($locale, $interp
             offset + endSymbol));
       });
 
-      scope.$watch(function ngPluralizeWatch() {
-        var value = parseFloat(scope.$eval(numberExp));
+      var desc = $parse.prepareObservable(numberExp);
+      var lastValue;
+
+      $watch.watchPaths(scope, desc.paths, function ngPluralizeWatch() {
+        var value = parseFloat(desc.get(scope));
 
         if (!isNaN(value)) {
           //if explicit number rule such as 1, 2, 3... is defined, just use it. Otherwise,
           //check it against pluralization rules in $locale service
           if (!(value in whens)) value = $locale.pluralCat(value - offset);
-           return whensExpFns[value](scope, element, true);
+          value = whensExpFns[value](scope, element, true);
         } else {
-          return '';
+          value = '';
         }
-      }, function ngPluralizeWatchAction(newVal) {
-        element.text(newVal);
+
+        if (value !== lastValue) {
+          lastValue = value;
+          element.text(value);
+        }
       });
     }
   };

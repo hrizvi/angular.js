@@ -2064,11 +2064,10 @@ describe('$compile', function() {
         expect(componentScope.ref).toBe('hello world');
 
         componentScope.ref = 'ignore me';
-        expect($rootScope.$apply).
+        expect(function () { $rootScope.$apply(); }).
             toThrowMinErr("$compile", "nonassign", "Expression ''hello ' + name' used with directive 'myComponent' is non-assignable!");
         expect(componentScope.ref).toBe('hello world');
         // reset since the exception was rethrown which prevented phase clearing
-        $rootScope.$$phase = null;
 
         $rootScope.name = 'misko';
         $rootScope.$apply();
@@ -3229,7 +3228,9 @@ describe('$compile', function() {
     it('should clear out non-resource_url src attributes', inject(function($compile, $rootScope, $sce) {
       element = $compile('<iframe src="{{testUrl}}"></iframe>')($rootScope);
       $rootScope.testUrl = $sce.trustAsUrl("javascript:doTrustedStuff()");
-      expect($rootScope.$apply).toThrowMinErr(
+      expect(function () {
+        $rootScope.$apply();
+      }).toThrowMinErr(
           "$interpolate", "interr", "Can't interpolate: {{testUrl}}\nError: [$sce:insecurl] Blocked " +
           "loading resource from url not allowed by $sceDelegate policy.  URL: javascript:doTrustedStuff()");
     }));

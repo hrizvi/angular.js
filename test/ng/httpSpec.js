@@ -911,37 +911,6 @@ describe('$http', function() {
     });
 
 
-    describe('scope.$apply', function() {
-
-      it('should $apply after success callback', function() {
-        $httpBackend.when('GET').respond(200);
-        $http({method: 'GET', url: '/some'});
-        $httpBackend.flush();
-        expect($rootScope.$apply).toHaveBeenCalledOnce();
-      });
-
-
-      it('should $apply after error callback', function() {
-        $httpBackend.when('GET').respond(404);
-        $http({method: 'GET', url: '/some'});
-        $httpBackend.flush();
-        expect($rootScope.$apply).toHaveBeenCalledOnce();
-      });
-
-
-      it('should $apply even if exception thrown during callback', inject(function($exceptionHandler){
-        $httpBackend.when('GET').respond(200);
-        callback.andThrow('error in callback');
-
-        $http({method: 'GET', url: '/some'}).then(callback);
-        $httpBackend.flush();
-        expect($rootScope.$apply).toHaveBeenCalledOnce();
-
-        $exceptionHandler.errors = [];
-      }));
-    });
-
-
     describe('transformData', function() {
 
       describe('request', function() {

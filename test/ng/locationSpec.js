@@ -447,43 +447,6 @@ describe('$location', function() {
     }));
 
 
-    // location.href = '...' fires hashchange event synchronously, so it might happen inside $apply
-    it('should not $apply when browser url changed inside $apply', inject(
-        function($rootScope, $browser, $location) {
-      var OLD_URL = $browser.url(),
-          NEW_URL = 'http://new.com/a/b#!/new';
-
-
-      $rootScope.$apply(function() {
-        $browser.url(NEW_URL);
-        $browser.poll(); // simulate firing event from browser
-        expect($location.absUrl()).toBe(OLD_URL); // should be async
-      });
-
-      expect($location.absUrl()).toBe(NEW_URL);
-    }));
-
-    // location.href = '...' fires hashchange event synchronously, so it might happen inside $digest
-    it('should not $apply when browser url changed inside $digest', inject(
-        function($rootScope, $browser, $location) {
-      var OLD_URL = $browser.url(),
-          NEW_URL = 'http://new.com/a/b#!/new',
-          notRunYet = true;
-
-      $rootScope.$watch(function() {
-        if (notRunYet) {
-          notRunYet = false;
-          $browser.url(NEW_URL);
-          $browser.poll(); // simulate firing event from browser
-          expect($location.absUrl()).toBe(OLD_URL); // should be async
-        }
-      });
-
-      $rootScope.$digest();
-      expect($location.absUrl()).toBe(NEW_URL);
-    }));
-
-
     it('should update browser when $location changes', inject(function($rootScope, $browser, $location) {
       var $browserUrl = spyOnlyCallsWithArgs($browser, 'url').andCallThrough();
       $location.path('/new/path');
@@ -544,7 +507,9 @@ describe('$location', function() {
 
 
     it('should update the browser if changed from within a watcher', inject(function($rootScope, $location, $browser) {
-      $rootScope.$watch(function() { return true; }, function() {
+      $rootScope.x = 1;
+
+      $rootScope.$watch('x', function() {
         $location.path('/changed');
       });
 

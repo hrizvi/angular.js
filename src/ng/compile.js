@@ -274,9 +274,9 @@ function $CompileProvider($provide) {
 
   this.$get = [
             '$injector', '$interpolate', '$exceptionHandler', '$http', '$templateCache', '$parse',
-            '$controller', '$rootScope', '$document', '$sce', '$$urlUtils', '$animate',
+            '$controller', '$watch', '$document', '$sce', '$$urlUtils', '$animate',
     function($injector,   $interpolate,   $exceptionHandler,   $http,   $templateCache,   $parse,
-             $controller,   $rootScope,   $document,   $sce,   $$urlUtils, $animate) {
+             $controller,   $watch,   $document,   $sce,   $$urlUtils, $animate) {
 
     var Attributes = function(element, attr) {
       this.$$element = element;
@@ -440,7 +440,7 @@ function $CompileProvider($provide) {
             listeners = ($$observers[key] || ($$observers[key] = []));
 
         listeners.push(fn);
-        $rootScope.$evalAsync(function() {
+        $watch.evalAsync(function() {
           if (!listeners.$$inter) {
             // no one registered attribute interpolation function, so lets call it manually
             fn(attrs[key]);
@@ -983,7 +983,10 @@ function $CompileProvider($provide) {
                 if (optional && !attrs[attrName]) {
                   return;
                 }
-                parentGet = $parse(attrs[attrName]);
+
+                var parentDesc = $parse.prepareObservable(attrs[attrName] || scopeName);
+                parentGet = parentDesc.get;
+
                 parentSet = parentGet.assign || function() {
                   // reset the change, or we will throw this exception on every $digest
                   lastValue = scope[scopeName] = parentGet(parentScope);
@@ -991,20 +994,51 @@ function $CompileProvider($provide) {
                       attrs[attrName], newIsolateScopeDirective.name);
                 };
                 lastValue = scope[scopeName] = parentGet(parentScope);
-                scope.$watch(function parentValueWatch() {
+
+                var ignoreChildChange = false;
+                var ignoreParentChange = false;
+
+                $watch.watchPaths(parentScope, parentDesc.paths, function () {
+                  if (ignoreParentChange) {
+                    ignoreParentChange = false;
+                    return;
+                  }
+
+                  var value = scope[scopeName];
                   var parentValue = parentGet(parentScope);
 
-                  if (parentValue !== scope[scopeName]) {
-                    // we are out of sync and need to copy
+                  if (parentValue !== value) {
                     if (parentValue !== lastValue) {
-                      // parent changed and it has precedence
-                      lastValue = scope[scopeName] = parentValue;
+                      lastValue = parentValue;
+                      scope[scopeName] = parentValue;
+                      ignoreChildChange = true;
                     } else {
-                      // if the parent can be assigned then do so
-                      parentSet(parentScope, parentValue = lastValue = scope[scopeName]);
+                      lastValue = value;
+                      parentSet(parentScope, value)
+                      ignoreParentChange = true;
                     }
                   }
-                  return parentValue;
+                });
+
+                scope.$watch(scopeName, function (value) {
+                  if (ignoreChildChange) {
+                    ignoreChildChange = false;
+                    return;
+                  }
+
+                  var parentValue = parentGet(parentScope);
+
+                  if (parentValue !== value) {
+                    if (parentValue !== lastValue) {
+                      lastValue = parentValue;
+                      scope[scopeName] = parentValue;
+                      ignoreChildChange = true;
+                    } else {
+                      lastValue = value;
+                      parentSet(parentScope, value)
+                      ignoreParentChange = true;
+                    }
+                  }
                 });
                 break;
               }
@@ -1269,8 +1303,9 @@ function $CompileProvider($provide) {
                 bindings = parent.data('$binding') || [];
             bindings.push(interpolateFn);
             safeAddClass(parent.data('$binding', bindings), 'ng-binding');
-            scope.$watch(interpolateFn, function interpolateFnWatchAction(value) {
-              node[0].nodeValue = value;
+
+            $watch.watchPaths(scope, interpolateFn.paths, function () {
+              node[0].nodeValue = interpolateFn(scope);
             });
           })
         });
@@ -1321,10 +1356,12 @@ function $CompileProvider($provide) {
 
           attr[name] = interpolateFn(scope);
           ($$observers[name] || ($$observers[name] = [])).$$inter = true;
-          (attr.$$observers && attr.$$observers[name].$$scope || scope).
-            $watch(interpolateFn, function interpolateFnWatchAction(value) {
-              attr.$set(name, value);
-            });
+
+          var observedScope = (attr.$$observers && attr.$$observers[name].$$scope || scope);
+
+          $watch.watchPaths(observedScope, interpolateFn.paths, function () {
+            attr.$set(name, interpolateFn(observedScope));
+          });
         })
       });
     }

@@ -515,8 +515,8 @@ function $LocationProvider(){
     }
   };
 
-  this.$get = ['$rootScope', '$browser', '$sniffer', '$rootElement',
-      function( $rootScope,   $browser,   $sniffer,   $rootElement) {
+  this.$get = ['$rootScope', '$watch', '$browser', '$sniffer', '$rootElement',
+      function( $rootScope,   $watch,   $browser,   $sniffer,   $rootElement) {
     var $location,
         LocationMode,
         baseHref = $browser.baseHref(), // if base[href] is undefined, it defaults to ''
@@ -555,7 +555,7 @@ function $LocationProvider(){
         if (rewrittenUrl != $browser.url()) {
           // update location manually
           $location.$$parse(rewrittenUrl);
-          $rootScope.$apply();
+          $locationWatch();
           // hack to work around FF6 bug 684208 when scenario runner clicks on links
           window.angular['ff-684208-preventDefault'] = true;
         }
@@ -575,25 +575,24 @@ function $LocationProvider(){
           $browser.url($location.absUrl());
           return;
         }
-        $rootScope.$evalAsync(function() {
-          var oldUrl = $location.absUrl();
 
-          $location.$$parse(newUrl);
-          afterLocationChange(oldUrl);
-        });
-        if (!$rootScope.$$phase) $rootScope.$digest();
+        var oldUrl = $location.absUrl();
+
+        $location.$$parse(newUrl);
+        afterLocationChange(oldUrl);
       }
     });
 
-    // update browser
     var changeCounter = 0;
-    $rootScope.$watch(function $locationWatch() {
+
+    function $locationWatch(async) {
       var oldUrl = $browser.url();
       var currentReplace = $location.$$replace;
 
       if (!changeCounter || oldUrl != $location.absUrl()) {
         changeCounter++;
-        $rootScope.$evalAsync(function() {
+
+        var changeLocation = function() {
           if ($rootScope.$broadcast('$locationChangeStart', $location.absUrl(), oldUrl).
               defaultPrevented) {
             $location.$$parse(oldUrl);
@@ -601,12 +600,21 @@ function $LocationProvider(){
             $browser.url($location.absUrl(), currentReplace);
             afterLocationChange(oldUrl);
           }
-        });
+        };
+
+        if (async) {
+          $rootScope.$evalAsync(changeLocation);
+        } else {
+          changeLocation();
+        }
       }
       $location.$$replace = false;
+    }
 
-      return changeCounter;
-    });
+    // Replacing the URL A with B and changing it back to A within one watch delivery loop
+    // iteration would not make $watch call the $locationWatch listener if we were just watching
+    // the $$url property.
+    $watch.watchPaths($location, ['$$url', '$$replace'], $locationWatch);
 
     return $location;
 

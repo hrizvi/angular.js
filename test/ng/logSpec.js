@@ -95,9 +95,9 @@ describe('$log', function() {
   );
 
   describe("$log.debug", function () {
-	 
+
 	  beforeEach(initService(false));
-	  
+
 	  it("should skip debugging output if disabled", inject(
 	    function(){
 	      $window.console = {log: log,
@@ -105,7 +105,7 @@ describe('$log', function() {
 	                         info: info,
 	                         error: error,
 	                         debug: debug};
-	    }, 
+	    },
 	    function($log) {
 	      $log.log();
 	      $log.warn();
@@ -115,7 +115,7 @@ describe('$log', function() {
 	      expect(logger).toEqual('log;warn;info;error;');
 	    }
   ));
-	  
+
   });
 
   describe('$log.error', function() {

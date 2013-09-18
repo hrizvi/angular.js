@@ -125,7 +125,7 @@
  */
 
 var ngOptionsDirective = valueFn({ terminal: true });
-var selectDirective = ['$compile', '$parse', function($compile,   $parse) {
+var selectDirective = ['$compile', '$parse', '$watch', function($compile, $parse, $watch) {
                          //0000111110000000000022220000000000000000000000333300000000000000444444444444444440000000005555555555555555500000006666666666666666600000000000000007777000000000000000000088888
   var NG_OPTIONS_REGEXP = /^\s*(.*?)(?:\s+as\s+(.*?))?(?:\s+group\s+by\s+(.*))?\s+for\s+(?:([\$\w][\$\w\d]*)|(?:\(\s*([\$\w][\$\w\d]*)\s*,\s*([\$\w][\$\w\d]*)\s*\)))\s+in\s+(.*?)(?:\s+track\s+by\s+(.*?))?$/,
       nullModelCtrl = {$setViewValue: noop};
@@ -266,7 +266,6 @@ var selectDirective = ['$compile', '$parse', function($compile,   $parse) {
       }
 
       function Multiple(scope, selectElement, ctrl) {
-        var lastView;
         ctrl.$render = function() {
           var items = new HashMap(ctrl.$viewValue);
           forEach(selectElement.find('option'), function(option) {
@@ -276,23 +275,18 @@ var selectDirective = ['$compile', '$parse', function($compile,   $parse) {
 
         // we have to do it on each watch since ngModel watches reference, but
         // we need to work of an array, so we need to see if anything was inserted/removed
-        scope.$watch(function selectMultipleWatch() {
-          if (!equals(lastView, ctrl.$viewValue)) {
-            lastView = copy(ctrl.$viewValue);
-            ctrl.$render();
-          }
-        });
+        $watch(ctrl, '$viewValue', function selectMultipleWatch(value, lastView) {
+          ctrl.$render();
+        }, true);
 
         selectElement.on('change', function() {
-          scope.$apply(function() {
-            var array = [];
-            forEach(selectElement.find('option'), function(option) {
-              if (option.selected) {
-                array.push(option.value);
-              }
-            });
-            ctrl.$setViewValue(array);
+          var array = [];
+          forEach(selectElement.find('option'), function(option) {
+            if (option.selected) {
+              array.push(option.value);
+            }
           });
+          ctrl.$setViewValue(array);
         });
       }
 
@@ -310,7 +304,8 @@ var selectDirective = ['$compile', '$parse', function($compile,   $parse) {
             keyName = match[5],
             groupByFn = $parse(match[3] || ''),
             valueFn = $parse(match[2] ? match[1] : valueName),
-            valuesFn = $parse(match[7]),
+            valuesScopeKey = match[7],
+            valuesFn = $parse(valuesScopeKey),
             track = match[8],
             trackFn = track ? $parse(match[8]) : null,
             // This is an array of array of existing option groups in DOM. We try to reuse these if possible
@@ -335,66 +330,66 @@ var selectDirective = ['$compile', '$parse', function($compile,   $parse) {
         selectElement.html('');
 
         selectElement.on('change', function() {
-          scope.$apply(function() {
-            var optionGroup,
-                collection = valuesFn(scope) || [],
-                locals = {},
-                key, value, optionElement, index, groupIndex, length, groupLength;
+          var optionGroup,
+              collection = valuesFn(scope) || [],
+              locals = {},
+              key, value, optionElement, index, groupIndex, length, groupLength;
 
-            if (multiple) {
-              value = [];
-              for (groupIndex = 0, groupLength = optionGroupsCache.length;
-                   groupIndex < groupLength;
-                   groupIndex++) {
-                // list of options for that group. (first item has the parent)
-                optionGroup = optionGroupsCache[groupIndex];
+          if (multiple) {
+            value = [];
+            for (groupIndex = 0, groupLength = optionGroupsCache.length;
+                 groupIndex < groupLength;
+                 groupIndex++) {
+              // list of options for that group. (first item has the parent)
+              optionGroup = optionGroupsCache[groupIndex];
 
-                for(index = 1, length = optionGroup.length; index < length; index++) {
-                  if ((optionElement = optionGroup[index].element)[0].selected) {
-                    key = optionElement.val();
-                    if (keyName) locals[keyName] = key;
-                    if (trackFn) {
-                      for (var trackIndex = 0; trackIndex < collection.length; trackIndex++) {
-                        locals[valueName] = collection[trackIndex];
-                        if (trackFn(scope, locals) == key) break;
-                      }
-                    } else {
-                      locals[valueName] = collection[key];
-                    }
-                    value.push(valueFn(scope, locals));
-                  }
-                }
-              }
-            } else {
-              key = selectElement.val();
-              if (key == '?') {
-                value = undefined;
-              } else if (key == ''){
-                value = null;
-              } else {
-                if (trackFn) {
-                  for (var trackIndex = 0; trackIndex < collection.length; trackIndex++) {
-                    locals[valueName] = collection[trackIndex];
-                    if (trackFn(scope, locals) == key) {
-                      value = valueFn(scope, locals);
-                      break;
-                    }
-                  }
-                } else {
-                  locals[valueName] = collection[key];
+              for(index = 1, length = optionGroup.length; index < length; index++) {
+                if ((optionElement = optionGroup[index].element)[0].selected) {
+                  key = optionElement.val();
                   if (keyName) locals[keyName] = key;
-                  value = valueFn(scope, locals);
+                  if (trackFn) {
+                    for (var trackIndex = 0; trackIndex < collection.length; trackIndex++) {
+                      locals[valueName] = collection[trackIndex];
+                      if (trackFn(scope, locals) == key) break;
+                    }
+                  } else {
+                    locals[valueName] = collection[key];
+                  }
+                  value.push(valueFn(scope, locals));
                 }
               }
             }
-            ctrl.$setViewValue(value);
-          });
+          } else {
+            key = selectElement.val();
+            if (key == '?') {
+              value = undefined;
+            } else if (key == ''){
+              value = null;
+            } else {
+              if (trackFn) {
+                for (var trackIndex = 0; trackIndex < collection.length; trackIndex++) {
+                  locals[valueName] = collection[trackIndex];
+                  if (trackFn(scope, locals) == key) {
+                    value = valueFn(scope, locals);
+                    break;
+                  }
+                }
+              } else {
+                locals[valueName] = collection[key];
+                if (keyName) locals[keyName] = key;
+                value = valueFn(scope, locals);
+              }
+            }
+          }
+          ctrl.$setViewValue(value);
+
+          render();
         });
 
         ctrl.$render = render;
 
-        // TODO(vojta): can't we optimize this ?
-        scope.$watch(render);
+        $watch(scope, valuesScopeKey, render, true);
+        $watch(ctrl, '$viewValue', render, true);
 
         function render() {
           var optionGroups = {'':[]}, // Temporary location for the option groups before we render them
@@ -567,7 +562,7 @@ var selectDirective = ['$compile', '$parse', function($compile,   $parse) {
   }
 }];
 
-var optionDirective = ['$interpolate', function($interpolate) {
+var optionDirective = ['$interpolate', '$watch', function($interpolate, $watch) {
   var nullSelectCtrl = {
     addOption: noop,
     removeOption: noop
@@ -599,10 +594,13 @@ var optionDirective = ['$interpolate', function($interpolate) {
         }
 
         if (interpolateFn) {
-          scope.$watch(interpolateFn, function interpolateWatchAction(newVal, oldVal) {
+          var oldVal;
+          $watch.watchPaths(scope, interpolateFn.paths, function interpolateWatchAction() {
+            var newVal = interpolateFn(scope);
             attr.$set('value', newVal);
             if (newVal !== oldVal) selectCtrl.removeOption(oldVal);
             selectCtrl.addOption(newVal);
+            oldVal = newVal;
           });
         } else {
           selectCtrl.addOption(attr.value);

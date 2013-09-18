@@ -960,8 +960,8 @@ var VALID_CLASS = 'ng-valid',
  *
  * 
  */
-var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$parse',
-    function($scope, $exceptionHandler, $attr, $element, $parse) {
+var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$parse', '$watch',
+    function($scope, $exceptionHandler, $attr, $element, $parse, $watch) {
   this.$viewValue = Number.NaN;
   this.$modelValue = Number.NaN;
   this.$parsers = [];
@@ -1115,9 +1115,7 @@ var NgModelController = ['$scope', '$exceptionHandler', '$attrs', '$element', '$
   // model -> value
   var ctrl = this;
 
-  $scope.$watch(function ngModelWatch() {
-    var value = ngModelGet($scope);
-
+  $watch($scope, $attr.ngModel, function ngModelWatch(value) {
     // if scope model value and ngModel value are out of sync
     if (ctrl.$modelValue !== value) {
 

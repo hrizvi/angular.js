@@ -287,7 +287,7 @@ describe('browser', function() {
       it('should default path in cookie to "" (empty string)', function () {
         browser.cookies('cookie', 'bender');
         // This only fails in Safari and IE when cookiePath returns undefined
-        // Where it now succeeds since baseHref return '' instead of undefined         
+        // Where it now succeeds since baseHref return '' instead of undefined
         expect(document.cookie).toEqual('cookie=bender');
       });
     });

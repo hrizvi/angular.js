@@ -148,7 +148,7 @@ describe('$interpolate', function() {
       expect(parts.length).toEqual(3);
       expect(parts[0]).toEqual("a");
       expect(parts[1].exp).toEqual("b");
-      expect(parts[1]({b:123})).toEqual(123);
+      expect(parts[1].get({b:123})).toEqual(123);
       expect(parts[2]).toEqual("C");
     }));
 
@@ -157,7 +157,7 @@ describe('$interpolate', function() {
       expect(parts.length).toEqual(2);
       expect(parts[0]).toEqual("a");
       expect(parts[1].exp).toEqual("b");
-      expect(parts[1]({b:123})).toEqual(123);
+      expect(parts[1].get({b:123})).toEqual(123);
     }));
 
     it('should Parse Begging Binding', inject(function($interpolate) {
