@@ -272,10 +272,16 @@ $WatchProvider.WatchManager.prototype.queuePostDeliveryCallback_ = function (cal
 $WatchProvider.WatchManager.prototype.addWatcher_ =
     function (obj, exp, desc, listener, deep_equal) {
   var watcher = new $WatchProvider.Watcher(obj, exp, desc, deep_equal);
+  var first_iteration = true;
 
   var self = this;
   watcher.onchange = function (value, last_value, changed_path) {
     // Note: Both Object.observer and Polymer/observe-js check for NaNs.
+
+    if (!first_iteration && value === last_value) {
+      return;
+    }
+    first_iteration = false;
 
     if (!deep_equal || !equals(value, last_value)) {
       self.got_changes_ = true;
@@ -347,7 +353,13 @@ $WatchProvider.WatchManager.prototype.processQueues_ = function () {
 
       var listener = item.listener;
       try {
-        item.listener.call(null, item.value, item.last_value, item.obj);
+        var value = item.watcher ? item.watcher.getCurrentValue() : item.value;
+        var last_value = item.last_value;
+        if (value !== item.value) {
+          item.watcher.setValue(value);
+        }
+
+        item.listener.call(null, value, last_value, item.obj);
 
         var new_value_log, old_value_log;
         try {
@@ -582,6 +594,11 @@ $WatchProvider.Watcher.prototype.getCurrentValue = function () {
 };
 
 
+$WatchProvider.Watcher.prototype.setValue = function (value) {
+  this.last_value = value;
+};
+
+
 $WatchProvider.Watcher.prototype.watchChildren_ = function (root_value, onchange) {
   var handleChildChange = function (added, removed, changed) {
     forEach(added, function (child_value, key) {
@@ -676,6 +693,13 @@ $WatchProvider.CollectionWatcher = function (root, exp) {
 
 
 $WatchProvider.CollectionWatcher.prototype.onchange = noop;
+
+
+$WatchProvider.CollectionWatcher.prototype.setValue = function (value) {
+  if (value !== this.collection_) {
+    this.setCollection(value);
+  }
+};
 
 
 $WatchProvider.CollectionWatcher.prototype.setCollection = function (collection) {

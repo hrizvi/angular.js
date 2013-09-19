@@ -17,14 +17,17 @@ describe('$watch', function () {
 
   it('should call listener after registration', inject(function ($watch) {
     var watch_value;
+    var old_watch_value;
 
     obj.a = 3;
     $watch(obj, 'a', function (value, old_value) {
       watch_value = value;
+      old_watch_value = old_value;
     });
 
     $watch.flush();
     expect(watch_value).toBe(3);
+    expect(watch_value).toBe(old_watch_value);
   }));
 
 
@@ -600,6 +603,24 @@ describe('$watch', function () {
         expect(err.message).toNotEqual('Should have thrown exception');
         expect(err.message.match(/fn: (watcherA|function.*?obj\.(a|b))/gm).length).toBe(10);
       }
+    }));
+
+
+    it('should not call watcher listener multiple times if the watched path is changed by ' +
+        'an $evalAsync callback', inject(function ($watch) {
+      var count = 0;
+
+      $watch(obj, 'a', function () {
+        count += 1;
+      });
+
+      obj.a = 2;
+      $watch.evalAsync(function () {
+        obj.a = 3;
+      });
+
+      $watch.flush();
+      expect(count).toBe(1);
     }));
   });
 
