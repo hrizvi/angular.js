@@ -167,7 +167,7 @@ describe('form', function() {
       browserTrigger(doc.find('input'));
 
       // let the browser process all events (and potentially reload the page)
-      setTimeout(function() { nextTurn = true;});
+      setTimeout(function() { nextTurn = true;}, 0);
 
       waitsFor(function() { return nextTurn; });
 
