@@ -685,7 +685,7 @@ $WatchProvider.CollectionWatcher.prototype.setCollection = function (collection)
 
   if (isArray(collection)) {
     this.observer_ = new $WatchProvider.ArrayObserver(collection, this.handleChange_, this);
-  } else {
+  } else if (isObject(collection)) {
     this.observer_ = new $WatchProvider.ObjectObserver(collection, this.handleChange_, this);
   }
 
