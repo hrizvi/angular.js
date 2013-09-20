@@ -164,7 +164,7 @@ describe('Scope', function() {
           try {
             $rootScope.$digest();
           } catch (err) {
-            expect(err.message).toMatch(/(\["a; .*?","b; .*?"\],){4}\["a; .*?","b; .*?"\]/m);
+            expect(err.message).toMatch(/(\["a; .*?"\],\["b; .*?"\],\["a; .*?"\],\["b; .*?"\],\["a; .*?"\]/m);
             throw err;
           }
         }).toThrow();
